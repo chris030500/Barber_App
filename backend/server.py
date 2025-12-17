@@ -748,17 +748,28 @@ async def edit_image_with_haircut(api_key: str, image_base64: str, haircut_style
         # Decode base64 to bytes
         image_bytes = base64.b64decode(image_base64)
         
-        # Prepare the edit prompt - focused on ONLY changing the hair
-        edit_prompt = f"""Edit ONLY the hair in this photo. Apply a professional {haircut_style} hairstyle/haircut.
+        # Prepare the edit prompt - STRICTLY only changing hair, nothing else
+        edit_prompt = f"""STRICT INSTRUCTION: Modify ONLY the hair/hairstyle in this photo to show a {haircut_style} haircut.
 
-CRITICAL INSTRUCTIONS:
-- Keep the person's face, skin, eyes, nose, mouth, ears EXACTLY the same
-- Do NOT change facial features, expression, or skin tone
-- ONLY modify the hair/hairstyle
-- Make it look like a professional barbershop result
-- The {haircut_style} should look natural and well-styled
-- Maintain the same lighting and photo quality
-- Keep the same background and clothing"""
+ABSOLUTELY DO NOT CHANGE:
+- Face shape, facial structure
+- Eyes, eyebrows, eyelashes
+- Nose shape and size
+- Mouth, lips, teeth
+- Ears
+- Skin color, texture, or any skin details
+- Facial hair (beard, mustache) if present
+- Expression
+- Neck, shoulders, clothing
+- Background
+- Lighting on the face
+
+ONLY CHANGE:
+- The hair on top of the head
+- The hairstyle/haircut style to {haircut_style}
+- Hair length and texture as needed for the {haircut_style} style
+
+The result must look like the EXACT SAME PERSON with a new {haircut_style} haircut. Do not alter ANY facial features whatsoever."""
 
         # Use httpx for async request to OpenAI API via Emergent proxy
         async with httpx.AsyncClient(timeout=120.0) as client:
