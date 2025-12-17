@@ -1,113 +1,231 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import Constants from 'expo-constants';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import Card from '../../components/ui/Card';
 import { useAuth } from '../../contexts/AuthContext';
 
 const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || process.env.EXPO_PUBLIC_BACKEND_URL;
 
 interface DashboardStats {
-  total_appointments: number;
-  completed_appointments: number;
-  total_barbers: number;
-  today_appointments: number;
+  totalAppointments: number;
+  todayAppointments: number;
+  completedAppointments: number;
+  cancelledAppointments: number;
+  totalBarbers: number;
+  availableBarbers: number;
+  totalServices: number;
+  estimatedRevenue: number;
+}
+
+interface RecentAppointment {
+  appointment_id: string;
+  scheduled_time: string;
+  status: string;
 }
 
 export default function AdminDashboardScreen() {
   const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
-    total_appointments: 0,
-    completed_appointments: 0,
-    total_barbers: 0,
-    today_appointments: 0,
+    totalAppointments: 0,
+    todayAppointments: 0,
+    completedAppointments: 0,
+    cancelledAppointments: 0,
+    totalBarbers: 0,
+    availableBarbers: 0,
+    totalServices: 0,
+    estimatedRevenue: 0
   });
+  const [recentAppointments, setRecentAppointments] = useState<RecentAppointment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    if (user?.barbershop_id) {
-      loadStats();
-    }
-  }, [user]);
+    loadDashboardData();
+  }, []);
 
-  const loadStats = async () => {
+  const loadDashboardData = async () => {
     try {
-      if (!user?.barbershop_id) return;
+      // Get barbershop first (admin's shop)
+      const shopsResponse = await axios.get(`${BACKEND_URL}/api/barbershops`);
+      const shop = shopsResponse.data[0]; // Assuming first shop for now
       
-      const response = await axios.get(
-        `${BACKEND_URL}/api/dashboard/stats?shop_id=${user.barbershop_id}`
+      if (!shop) {
+        setLoading(false);
+        return;
+      }
+
+      // Fetch all data in parallel
+      const [appointmentsRes, barbersRes, servicesRes] = await Promise.all([
+        axios.get(`${BACKEND_URL}/api/appointments`, { params: { shop_id: shop.shop_id } }),
+        axios.get(`${BACKEND_URL}/api/barbers`, { params: { shop_id: shop.shop_id } }),
+        axios.get(`${BACKEND_URL}/api/services`, { params: { shop_id: shop.shop_id } })
+      ]);
+
+      const appointments = appointmentsRes.data;
+      const barbers = barbersRes.data;
+      const services = servicesRes.data;
+
+      // Calculate stats
+      const today = new Date().toDateString();
+      const todayAppointments = appointments.filter((a: any) => 
+        new Date(a.scheduled_time).toDateString() === today
       );
-      setStats(response.data);
+      const completedAppointments = appointments.filter((a: any) => a.status === 'completed');
+      const cancelledAppointments = appointments.filter((a: any) => a.status === 'cancelled');
+      const availableBarbers = barbers.filter((b: any) => b.status === 'available');
+
+      // Estimate revenue (average service price * completed appointments)
+      const avgPrice = services.length > 0 
+        ? services.reduce((sum: number, s: any) => sum + s.price, 0) / services.length 
+        : 0;
+      const estimatedRevenue = completedAppointments.length * avgPrice;
+
+      setStats({
+        totalAppointments: appointments.length,
+        todayAppointments: todayAppointments.length,
+        completedAppointments: completedAppointments.length,
+        cancelledAppointments: cancelledAppointments.length,
+        totalBarbers: barbers.length,
+        availableBarbers: availableBarbers.length,
+        totalServices: services.length,
+        estimatedRevenue
+      });
+
+      // Get recent appointments (last 5)
+      const sorted = appointments
+        .sort((a: any, b: any) => new Date(b.scheduled_time).getTime() - new Date(a.scheduled_time).getTime())
+        .slice(0, 5);
+      setRecentAppointments(sorted);
+
     } catch (error) {
-      console.error('Error loading stats:', error);
+      console.error('Error loading dashboard data:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadDashboardData();
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'scheduled': return '#3B82F6';
+      case 'completed': return '#10B981';
+      case 'cancelled': return '#EF4444';
+      default: return '#64748B';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'scheduled': return 'Programada';
+      case 'completed': return 'Completada';
+      case 'cancelled': return 'Cancelada';
+      default: return status;
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Dashboard</Text>
-          <Text style={styles.subtitle}>Bienvenido, {user?.name}</Text>
-        </View>
-        <Ionicons name="notifications-outline" size={28} color="#1E293B" />
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.content}
+      <ScrollView 
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
-        <View style={styles.statsGrid}>
-          <Card style={[styles.statCard, { backgroundColor: '#EFF6FF' }]}>
-            <Ionicons name="calendar" size={32} color="#2563EB" />
-            <Text style={styles.statValue}>{stats.total_appointments}</Text>
-            <Text style={styles.statLabel}>Total Citas</Text>
-          </Card>
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.greeting}>¡Hola, {user?.name || 'Admin'}!</Text>
+            <Text style={styles.date}>
+              {format(new Date(), "EEEE, d 'de' MMMM", { locale: es })}
+            </Text>
+          </View>
+          <View style={styles.adminBadge}>
+            <Ionicons name="shield-checkmark" size={20} color="#7C3AED" />
+            <Text style={styles.adminText}>Admin</Text>
+          </View>
+        </View>
 
-          <Card style={[styles.statCard, { backgroundColor: '#F0FDF4' }]}>
-            <Ionicons name="checkmark-circle" size={32} color="#10B981" />
-            <Text style={styles.statValue}>{stats.completed_appointments}</Text>
+        {/* Main Stats */}
+        <View style={styles.statsGrid}>
+          <Card style={[styles.statCard, styles.statPrimary]}>
+            <Ionicons name="calendar" size={28} color="#FFFFFF" />
+            <Text style={styles.statNumberPrimary}>{stats.todayAppointments}</Text>
+            <Text style={styles.statLabelPrimary}>Citas Hoy</Text>
+          </Card>
+          <Card style={styles.statCard}>
+            <Ionicons name="checkmark-circle" size={28} color="#10B981" />
+            <Text style={styles.statNumber}>{stats.completedAppointments}</Text>
             <Text style={styles.statLabel}>Completadas</Text>
           </Card>
-
-          <Card style={[styles.statCard, { backgroundColor: '#FEF3C7' }]}>
-            <Ionicons name="people" size={32} color="#F59E0B" />
-            <Text style={styles.statValue}>{stats.total_barbers}</Text>
+          <Card style={styles.statCard}>
+            <Ionicons name="people" size={28} color="#2563EB" />
+            <Text style={styles.statNumber}>{stats.availableBarbers}/{stats.totalBarbers}</Text>
             <Text style={styles.statLabel}>Barberos</Text>
           </Card>
-
-          <Card style={[styles.statCard, { backgroundColor: '#FCE7F3' }]}>
-            <Ionicons name="today" size={32} color="#EC4899" />
-            <Text style={styles.statValue}>{stats.today_appointments}</Text>
-            <Text style={styles.statLabel}>Hoy</Text>
+          <Card style={styles.statCard}>
+            <Ionicons name="cash" size={28} color="#F59E0B" />
+            <Text style={styles.statNumber}>${stats.estimatedRevenue.toFixed(0)}</Text>
+            <Text style={styles.statLabel}>Ingresos Est.</Text>
           </Card>
         </View>
 
-        <Card style={styles.recentSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Actividad Reciente</Text>
-            <Ionicons name="time-outline" size={20} color="#64748B" />
+        {/* Quick Stats Row */}
+        <View style={styles.quickStatsRow}>
+          <View style={styles.quickStat}>
+            <Text style={styles.quickStatNumber}>{stats.totalAppointments}</Text>
+            <Text style={styles.quickStatLabel}>Total Citas</Text>
           </View>
-          <Text style={styles.emptyText}>No hay actividad reciente</Text>
-        </Card>
+          <View style={styles.quickStatDivider} />
+          <View style={styles.quickStat}>
+            <Text style={styles.quickStatNumber}>{stats.totalServices}</Text>
+            <Text style={styles.quickStatLabel}>Servicios</Text>
+          </View>
+          <View style={styles.quickStatDivider} />
+          <View style={styles.quickStat}>
+            <Text style={[styles.quickStatNumber, { color: '#EF4444' }]}>{stats.cancelledAppointments}</Text>
+            <Text style={styles.quickStatLabel}>Canceladas</Text>
+          </View>
+        </View>
 
-        <Card style={styles.quickActions}>
-          <Text style={styles.sectionTitle}>Acciones Rápidas</Text>
-          <View style={styles.actionGrid}>
-            <TouchableOpacity style={styles.actionButton}>
-              <Ionicons name="person-add" size={24} color="#2563EB" />
-              <Text style={styles.actionText}>Agregar Barbero</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton}>
-              <Ionicons name="add-circle" size={24} color="#2563EB" />
-              <Text style={styles.actionText}>Nuevo Servicio</Text>
-            </TouchableOpacity>
-          </View>
-        </Card>
+        {/* Recent Appointments */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Citas Recientes</Text>
+          {recentAppointments.length === 0 ? (
+            <Card style={styles.emptyCard}>
+              <Ionicons name="calendar-outline" size={40} color="#CBD5E1" />
+              <Text style={styles.emptyText}>No hay citas recientes</Text>
+            </Card>
+          ) : (
+            recentAppointments.map((apt) => (
+              <Card key={apt.appointment_id} style={styles.appointmentCard}>
+                <View style={styles.appointmentRow}>
+                  <View style={styles.appointmentInfo}>
+                    <Text style={styles.appointmentTime}>
+                      {format(new Date(apt.scheduled_time), "HH:mm", { locale: es })}
+                    </Text>
+                    <Text style={styles.appointmentDate}>
+                      {format(new Date(apt.scheduled_time), "d MMM", { locale: es })}
+                    </Text>
+                  </View>
+                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(apt.status) + '20' }]}>
+                    <Text style={[styles.statusText, { color: getStatusColor(apt.status) }]}>
+                      {getStatusText(apt.status)}
+                    </Text>
+                  </View>
+                </View>
+              </Card>
+            ))
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -123,87 +241,147 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 20,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
   },
-  title: {
-    fontSize: 28,
+  greeting: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#1E293B',
   },
-  subtitle: {
+  date: {
     fontSize: 14,
     color: '#64748B',
-    marginTop: 2,
+    marginTop: 4,
+    textTransform: 'capitalize',
   },
-  content: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+  adminBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  adminText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#7C3AED',
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    padding: 12,
     gap: 12,
-    marginBottom: 16,
   },
   statCard: {
-    flex: 1,
-    minWidth: '47%',
+    width: '47%',
     alignItems: 'center',
-    paddingVertical: 24,
+    paddingVertical: 20,
   },
-  statValue: {
-    fontSize: 32,
+  statPrimary: {
+    backgroundColor: '#2563EB',
+  },
+  statNumber: {
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#1E293B',
     marginTop: 8,
   },
+  statNumberPrimary: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginTop: 8,
+  },
   statLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#64748B',
     marginTop: 4,
   },
-  recentSection: {
+  statLabelPrimary: {
+    fontSize: 12,
+    color: '#BFDBFE',
+    marginTop: 4,
+  },
+  quickStatsRow: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    borderRadius: 12,
+    paddingVertical: 16,
     marginBottom: 16,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  quickStat: {
+    flex: 1,
     alignItems: 'center',
-    marginBottom: 16,
+  },
+  quickStatNumber: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  quickStatLabel: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  quickStatDivider: {
+    width: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  section: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1E293B',
+    marginBottom: 12,
+  },
+  appointmentCard: {
+    marginBottom: 8,
+    padding: 12,
+  },
+  appointmentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  appointmentInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  appointmentTime: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  appointmentDate: {
+    fontSize: 14,
+    color: '#64748B',
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  emptyCard: {
+    alignItems: 'center',
+    paddingVertical: 32,
   },
   emptyText: {
     fontSize: 14,
-    color: '#94A3B8',
-    textAlign: 'center',
-    paddingVertical: 24,
-  },
-  quickActions: {},
-  actionGrid: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
-  },
-  actionButton: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 20,
-    backgroundColor: '#EFF6FF',
-    borderRadius: 12,
-  },
-  actionText: {
-    fontSize: 12,
-    color: '#2563EB',
+    color: '#64748B',
     marginTop: 8,
-    fontWeight: '500',
   },
 });
-
-import { TouchableOpacity } from 'react-native';
