@@ -158,6 +158,9 @@ backend:
         - working: true
           agent: "testing"
           comment: "✅ PASSED: Generate Haircut Image endpoint working correctly. Successfully generates AI images using OpenAI gpt-image-1. Returns base64 encoded image (2.8MB) and correct style_applied field. Endpoint handles 60+ second processing time properly."
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED: IMPROVED Generate Haircut Image endpoint tested successfully. Now performs 2-step process: 1) Analyzes facial features using Gemini (facial_description field), 2) Generates personalized image using that description + haircut style. All required fields present: success, generated_image_base64 (2.7MB+), style_applied, facial_description (200+ chars). Tested fade, undercut, pompadour styles. 120-second timeout handled properly for dual AI calls."
 
 frontend:
   - task: "AI Scan Screen with Reference & Generated Images"
