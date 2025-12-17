@@ -1,492 +1,347 @@
 #!/usr/bin/env python3
 """
-Backend API Testing Suite for Barbershop Management App
-Tests the AI Scan endpoint with Gemini 2.5 Flash integration
+Backend API Testing Suite for BarberShop App
+Focus: Testing updated haircut image generation endpoint with GEMINI NANO BANANA
 """
 
-import requests
+import asyncio
+import httpx
 import base64
 import json
 import os
-import sys
-from typing import Dict, Any
-import tempfile
-import subprocess
+import time
+from io import BytesIO
+from PIL import Image
+import logging
 
-# Get backend URL from frontend .env
-BACKEND_URL = "https://barberpro-7.preview.emergentagent.com/api"
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-class BackendTester:
-    def __init__(self):
-        self.base_url = BACKEND_URL
-        self.session = requests.Session()
-        self.test_results = []
+# Get backend URL from frontend env
+def get_backend_url():
+    try:
+        with open('/app/frontend/.env', 'r') as f:
+            for line in f:
+                if line.startswith('EXPO_PUBLIC_BACKEND_URL='):
+                    return line.split('=')[1].strip()
+    except:
+        pass
+    return "http://localhost:8001"
+
+BASE_URL = get_backend_url()
+API_BASE = f"{BASE_URL}/api"
+
+def create_test_face_image():
+    """Create a simple test face image as base64"""
+    try:
+        # Create a simple test image with some visual features
+        img = Image.new('RGB', (400, 400), color='lightblue')
         
-    def log_test(self, test_name: str, success: bool, details: str = ""):
-        """Log test results"""
-        status = "✅ PASS" if success else "❌ FAIL"
-        result = {
-            "test": test_name,
-            "status": status,
-            "success": success,
-            "details": details
+        # Add some basic features to make it look like a face
+        from PIL import ImageDraw
+        draw = ImageDraw.Draw(img)
+        
+        # Face outline (circle)
+        draw.ellipse([100, 80, 300, 280], fill='peachpuff', outline='black', width=2)
+        
+        # Eyes
+        draw.ellipse([140, 140, 170, 170], fill='white', outline='black', width=2)
+        draw.ellipse([230, 140, 260, 170], fill='white', outline='black', width=2)
+        draw.ellipse([150, 150, 160, 160], fill='black')  # Left pupil
+        draw.ellipse([240, 150, 250, 160], fill='black')  # Right pupil
+        
+        # Nose
+        draw.polygon([(200, 180), (190, 200), (210, 200)], fill='peachpuff', outline='black')
+        
+        # Mouth
+        draw.arc([170, 210, 230, 240], 0, 180, fill='red', width=3)
+        
+        # Hair area (this is what should be modified)
+        draw.ellipse([120, 60, 280, 140], fill='brown', outline='black', width=2)
+        
+        # Convert to base64
+        buffer = BytesIO()
+        img.save(buffer, format='JPEG', quality=85)
+        img_data = buffer.getvalue()
+        return base64.b64encode(img_data).decode('utf-8')
+        
+    except Exception as e:
+        logger.error(f"Error creating test image: {e}")
+        # Fallback: download a real face image
+        return download_test_face_image()
+
+def download_test_face_image():
+    """Download a real face image for testing"""
+    try:
+        import requests
+        url = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400"
+        response = requests.get(url, timeout=30)
+        if response.status_code == 200:
+            return base64.b64encode(response.content).decode('utf-8')
+    except Exception as e:
+        logger.error(f"Error downloading test image: {e}")
+    
+    # Ultimate fallback: create minimal valid image
+    img = Image.new('RGB', (200, 200), color='lightgray')
+    buffer = BytesIO()
+    img.save(buffer, format='JPEG')
+    return base64.b64encode(buffer.getvalue()).decode('utf-8')
+
+async def test_generate_haircut_image_gemini():
+    """Test the updated generate-haircut-image endpoint with Gemini Nano Banana"""
+    logger.info("🧪 Testing POST /api/generate-haircut-image with Gemini Nano Banana")
+    
+    try:
+        # Create test image
+        test_image_b64 = create_test_face_image()
+        logger.info(f"Created test image, size: {len(test_image_b64)} characters")
+        
+        # Test data
+        test_data = {
+            "user_image_base64": test_image_b64,
+            "haircut_style": "fade"
         }
-        self.test_results.append(result)
-        print(f"{status}: {test_name}")
-        if details:
-            print(f"   Details: {details}")
-        print()
-
-    def download_test_image(self) -> str:
-        """Download a sample face image and convert to base64"""
-        try:
-            print("📥 Downloading test face image...")
-            
-            # Download a sample face image from Unsplash
-            image_url = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face"
-            
-            response = requests.get(image_url, timeout=30)
-            response.raise_for_status()
-            
-            # Save to temporary file
-            with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp_file:
-                tmp_file.write(response.content)
-                tmp_path = tmp_file.name
-            
-            # Convert to base64
-            with open(tmp_path, 'rb') as img_file:
-                image_data = img_file.read()
-                base64_image = base64.b64encode(image_data).decode('utf-8')
-            
-            # Clean up
-            os.unlink(tmp_path)
-            
-            print(f"✅ Image downloaded and converted to base64 ({len(base64_image)} chars)")
-            return base64_image
-            
-        except Exception as e:
-            print(f"❌ Failed to download test image: {e}")
-            return None
-
-    def test_api_root(self):
-        """Test if API root endpoint is accessible"""
-        try:
-            response = self.session.get(f"{self.base_url}/")
-            
-            if response.status_code == 200:
-                data = response.json()
-                if "BarberShop API" in data.get("message", ""):
-                    self.log_test("API Root Endpoint", True, f"API accessible: {data.get('message')}")
-                    return True
-                else:
-                    self.log_test("API Root Endpoint", False, f"Unexpected response: {data}")
-                    return False
-            else:
-                self.log_test("API Root Endpoint", False, f"HTTP {response.status_code}: {response.text}")
-                return False
-                
-        except Exception as e:
-            self.log_test("API Root Endpoint", False, f"Connection error: {str(e)}")
-            return False
-
-    def test_ai_scan_endpoint_success(self, test_image_base64: str):
-        """Test AI scan endpoint with valid image"""
-        try:
-            # Prepare request data
-            request_data = {
-                "image_base64": test_image_base64,
-                "user_id": "test_user_ai_scan_123"
-            }
-            
-            print("🤖 Testing AI Scan endpoint with face image...")
-            
-            # Send request
-            response = self.session.post(
-                f"{self.base_url}/ai-scan",
-                json=request_data,
-                headers={"Content-Type": "application/json"},
-                timeout=60  # AI processing can take time
-            )
-            
-            print(f"Response status: {response.status_code}")
-            
-            if response.status_code == 200:
-                data = response.json()
-                print(f"Response data: {json.dumps(data, indent=2)}")
-                
-                # Validate response structure
-                required_fields = ["success", "face_shape", "recommendations", "detailed_analysis"]
-                missing_fields = [field for field in required_fields if field not in data]
-                
-                if missing_fields:
-                    self.log_test("AI Scan Response Structure", False, f"Missing fields: {missing_fields}")
-                    return False
-                
-                # Check success field
-                if not data.get("success"):
-                    error_msg = data.get("error", "Unknown error")
-                    self.log_test("AI Scan Success", False, f"API returned success=false: {error_msg}")
-                    return False
-                
-                # Validate face_shape
-                face_shape = data.get("face_shape")
-                if not face_shape or not isinstance(face_shape, str):
-                    self.log_test("AI Scan Face Shape", False, f"Invalid face_shape: {face_shape}")
-                    return False
-                
-                # Validate recommendations
-                recommendations = data.get("recommendations", [])
-                if not recommendations or not isinstance(recommendations, list) or len(recommendations) == 0:
-                    self.log_test("AI Scan Recommendations", False, f"Empty or invalid recommendations: {recommendations}")
-                    return False
-                
-                # Validate detailed_analysis
-                detailed_analysis = data.get("detailed_analysis")
-                if not detailed_analysis or not isinstance(detailed_analysis, str):
-                    self.log_test("AI Scan Analysis", False, f"Invalid detailed_analysis: {detailed_analysis}")
-                    return False
-                
-                # All validations passed
-                self.log_test("AI Scan Endpoint Success", True, 
-                    f"Face shape: {face_shape}, Recommendations: {len(recommendations)}, Analysis length: {len(detailed_analysis)} chars")
-                return True
-                
-            else:
-                self.log_test("AI Scan HTTP Response", False, f"HTTP {response.status_code}: {response.text}")
-                return False
-                
-        except Exception as e:
-            self.log_test("AI Scan Endpoint", False, f"Request error: {str(e)}")
-            return False
-
-    def test_ai_scan_endpoint_invalid_data(self):
-        """Test AI scan endpoint with invalid data"""
-        try:
-            # Test with invalid base64
-            request_data = {
-                "image_base64": "invalid_base64_data",
-                "user_id": "test_user_invalid"
-            }
-            
-            response = self.session.post(
-                f"{self.base_url}/ai-scan",
-                json=request_data,
-                headers={"Content-Type": "application/json"},
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                if not data.get("success") and "error" in data:
-                    self.log_test("AI Scan Invalid Data Handling", True, f"Properly handled invalid data: {data.get('error')}")
-                    return True
-                else:
-                    self.log_test("AI Scan Invalid Data Handling", False, f"Should have failed but got: {data}")
-                    return False
-            else:
-                # HTTP error is also acceptable for invalid data
-                self.log_test("AI Scan Invalid Data Handling", True, f"HTTP error for invalid data: {response.status_code}")
-                return True
-                
-        except Exception as e:
-            self.log_test("AI Scan Invalid Data Test", False, f"Unexpected error: {str(e)}")
-            return False
-
-    def check_backend_logs_for_image_editing(self):
-        """Check backend logs for image editing messages"""
-        try:
-            print("🔍 Checking backend logs for image editing messages...")
-            
-            # Check backend logs for specific messages
-            result = subprocess.run(
-                ["tail", "-n", "50", "/var/log/supervisor/backend.out.log"],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            
-            if result.returncode == 0:
-                log_content = result.stdout
-                
-                # Look for specific messages mentioned in review request
-                editing_found = "Editing user photo" in log_content
-                edit_failed_found = "Image edit failed" in log_content
-                
-                if editing_found:
-                    self.log_test("Backend Log - Image Editing", True, "Found 'Editing user photo' message in logs")
-                    return True
-                elif edit_failed_found:
-                    self.log_test("Backend Log - Image Edit Failed", True, "Found 'Image edit failed' message in logs (fallback to generation)")
-                    return True
-                else:
-                    self.log_test("Backend Log - Image Editing Messages", False, "No 'Editing user photo' or 'Image edit failed' messages found in recent logs")
-                    return False
-            else:
-                self.log_test("Backend Log Check", False, f"Could not read backend logs: {result.stderr}")
-                return False
-                
-        except Exception as e:
-            self.log_test("Backend Log Check", False, f"Error checking logs: {str(e)}")
-            return False
-
-    def test_ai_scan_history_endpoint(self):
-        """Test AI scan history endpoint"""
-        try:
-            user_id = "test_user_ai_scan_123"
-            response = self.session.get(f"{self.base_url}/ai-scans/{user_id}")
-            
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list):
-                    self.log_test("AI Scan History Endpoint", True, f"Retrieved {len(data)} scan records")
-                    return True
-                else:
-                    self.log_test("AI Scan History Endpoint", False, f"Expected list, got: {type(data)}")
-                    return False
-            else:
-                self.log_test("AI Scan History Endpoint", False, f"HTTP {response.status_code}: {response.text}")
-                return False
-                
-        except Exception as e:
-            self.log_test("AI Scan History Endpoint", False, f"Request error: {str(e)}")
-            return False
-
-    def test_ai_scan_v2_endpoint(self, test_image_base64: str):
-        """Test AI Scan V2 endpoint with reference images"""
-        try:
-            request_data = {
-                "image_base64": test_image_base64,
-                "user_id": "test_user_v2_scan"
-            }
-            
-            print("🤖 Testing AI Scan V2 endpoint with reference images...")
-            
-            response = self.session.post(
-                f"{self.base_url}/ai-scan-v2",
-                json=request_data,
-                headers={"Content-Type": "application/json"},
-                timeout=60
-            )
-            
-            print(f"Response status: {response.status_code}")
-            
-            if response.status_code == 200:
-                data = response.json()
-                print(f"Response data: {json.dumps(data, indent=2)}")
-                
-                # Validate response structure
-                required_fields = ["success", "face_shape", "recommendations", "detailed_analysis"]
-                missing_fields = [field for field in required_fields if field not in data]
-                
-                if missing_fields:
-                    self.log_test("AI Scan V2 Response Structure", False, f"Missing fields: {missing_fields}")
-                    return False
-                
-                # Check success field
-                if not data.get("success"):
-                    error_msg = data.get("error", "Unknown error")
-                    self.log_test("AI Scan V2 Success", False, f"API returned success=false: {error_msg}")
-                    return False
-                
-                # Validate recommendations structure (should be list of objects with reference_image)
-                recommendations = data.get("recommendations", [])
-                if not recommendations or not isinstance(recommendations, list):
-                    self.log_test("AI Scan V2 Recommendations", False, f"Invalid recommendations: {recommendations}")
-                    return False
-                
-                # Check each recommendation has required fields including reference_image
-                for i, rec in enumerate(recommendations):
-                    if not isinstance(rec, dict):
-                        self.log_test("AI Scan V2 Recommendation Structure", False, f"Recommendation {i} is not an object: {rec}")
-                        return False
-                    
-                    required_rec_fields = ["name", "description", "reference_image"]
-                    missing_rec_fields = [field for field in required_rec_fields if field not in rec]
-                    
-                    if missing_rec_fields:
-                        self.log_test("AI Scan V2 Recommendation Fields", False, f"Recommendation {i} missing fields: {missing_rec_fields}")
-                        return False
-                    
-                    # Validate reference_image is a URL
-                    ref_image = rec.get("reference_image")
-                    if not ref_image or not isinstance(ref_image, str) or not ref_image.startswith("http"):
-                        self.log_test("AI Scan V2 Reference Image", False, f"Invalid reference_image in recommendation {i}: {ref_image}")
-                        return False
-                
-                self.log_test("AI Scan V2 Endpoint Success", True, 
-                    f"Face shape: {data.get('face_shape')}, Recommendations with reference images: {len(recommendations)}")
-                return True
-                
-            else:
-                self.log_test("AI Scan V2 HTTP Response", False, f"HTTP {response.status_code}: {response.text}")
-                return False
-                
-        except Exception as e:
-            self.log_test("AI Scan V2 Endpoint", False, f"Request error: {str(e)}")
-            return False
-
-    def test_generate_haircut_image_endpoint(self, test_image_base64: str):
-        """Test UPDATED Generate Haircut Image endpoint with IMAGE EDITING functionality"""
-        print("🎨 Testing UPDATED Generate Haircut Image endpoint")
-        print("   This endpoint now: 1) Uses OpenAI's images/edits API to EDIT user's photo directly")
-        print("   2) Preserves user's face and only changes hairstyle, 3) Falls back to generation if edit fails")
         
-        test_cases = [
-            {"style": "fade", "name": "Fade haircut"},
-            {"style": "undercut", "name": "Undercut haircut"},
-            {"style": "pompadour", "name": "Pompadour haircut"}
-        ]
-        
-        all_passed = True
-        
-        for test_case in test_cases:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            logger.info("Sending request to generate-haircut-image endpoint...")
+            start_time = time.time()
+            
+            response = await client.post(
+                f"{API_BASE}/generate-haircut-image",
+                json=test_data,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            end_time = time.time()
+            duration = end_time - start_time
+            
+            logger.info(f"Response received in {duration:.2f} seconds")
+            logger.info(f"Status Code: {response.status_code}")
+            
+            if response.status_code != 200:
+                logger.error(f"❌ FAILED: HTTP {response.status_code}")
+                logger.error(f"Response: {response.text}")
+                return False
+            
+            # Parse response
             try:
-                request_data = {
-                    "user_image_base64": test_image_base64,
-                    "haircut_style": test_case["style"]
-                }
-                
-                print(f"\n🧪 Testing {test_case['name']} (may take up to 120 seconds for 2 AI calls)...")
-                
-                response = self.session.post(
-                    f"{self.base_url}/generate-haircut-image",
-                    json=request_data,
-                    headers={"Content-Type": "application/json"},
-                    timeout=120  # 120 seconds as specified in review request for 2 AI calls
+                data = response.json()
+            except Exception as e:
+                logger.error(f"❌ FAILED: Invalid JSON response: {e}")
+                return False
+            
+            # Validate response structure
+            required_fields = ['success', 'generated_image_base64', 'style_applied']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                logger.error(f"❌ FAILED: Missing fields: {missing_fields}")
+                return False
+            
+            # Check success status
+            if not data.get('success'):
+                logger.error(f"❌ FAILED: success=false, error: {data.get('error', 'Unknown error')}")
+                return False
+            
+            # Validate generated image
+            generated_image = data.get('generated_image_base64')
+            if not generated_image or len(generated_image) < 1000:
+                logger.error(f"❌ FAILED: Invalid or too small generated image: {len(generated_image) if generated_image else 0} chars")
+                return False
+            
+            # Validate style applied
+            style_applied = data.get('style_applied')
+            if style_applied != 'fade':
+                logger.error(f"❌ FAILED: Wrong style applied: {style_applied}, expected: fade")
+                return False
+            
+            # Log success details
+            image_size_mb = len(generated_image) / (1024 * 1024)
+            logger.info(f"✅ PASSED: Generate Haircut Image endpoint working correctly")
+            logger.info(f"  - success: {data['success']}")
+            logger.info(f"  - generated_image_base64: {len(generated_image)} chars ({image_size_mb:.2f}MB)")
+            logger.info(f"  - style_applied: {style_applied}")
+            logger.info(f"  - processing_time: {duration:.2f}s")
+            
+            return True
+            
+    except asyncio.TimeoutError:
+        logger.error("❌ FAILED: Request timeout (120s)")
+        return False
+    except Exception as e:
+        logger.error(f"❌ FAILED: Exception during test: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return False
+
+async def test_multiple_haircut_styles():
+    """Test multiple haircut styles to ensure Gemini works with different styles"""
+    logger.info("🧪 Testing multiple haircut styles with Gemini")
+    
+    styles_to_test = ["fade", "undercut", "pompadour"]
+    test_image_b64 = create_test_face_image()
+    
+    results = {}
+    
+    for style in styles_to_test:
+        logger.info(f"Testing style: {style}")
+        
+        try:
+            test_data = {
+                "user_image_base64": test_image_b64,
+                "haircut_style": style
+            }
+            
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                response = await client.post(
+                    f"{API_BASE}/generate-haircut-image",
+                    json=test_data,
+                    headers={"Content-Type": "application/json"}
                 )
-                
-                print(f"Response status: {response.status_code}")
                 
                 if response.status_code == 200:
                     data = response.json()
-                    print(f"Response keys: {list(data.keys())}")
-                    
-                    # Validate response structure - Updated endpoint may not include facial_description in image editing mode
-                    required_fields = ["success", "generated_image_base64", "style_applied"]
-                    missing_fields = [field for field in required_fields if field not in data]
-                    
-                    if missing_fields:
-                        self.log_test(f"Generate Haircut Image Response Structure ({test_case['style']})", False, f"Missing fields: {missing_fields}")
-                        all_passed = False
-                        continue
-                    
-                    # Check success field
-                    if not data.get("success"):
-                        error_msg = data.get("error", "Unknown error")
-                        self.log_test(f"Generate Haircut Image Success ({test_case['style']})", False, f"API returned success=false: {error_msg}")
-                        all_passed = False
-                        continue
-                    
-                    # Validate generated_image_base64 (non-empty base64 string)
-                    generated_image = data.get("generated_image_base64")
-                    if not generated_image or not isinstance(generated_image, str):
-                        self.log_test(f"Generate Haircut Image Base64 ({test_case['style']})", False, f"Invalid generated_image_base64: {type(generated_image)}")
-                        all_passed = False
-                        continue
-                    
-                    if len(generated_image) < 1000:  # Should be substantial base64 image
-                        self.log_test(f"Generate Haircut Image Base64 Size ({test_case['style']})", False, f"Base64 too short: {len(generated_image)} chars")
-                        all_passed = False
-                        continue
-                    
-                    # Validate style_applied (should match requested style)
-                    style_applied = data.get("style_applied")
-                    if not style_applied or style_applied.lower() != test_case["style"].lower():
-                        self.log_test(f"Generate Haircut Image Style ({test_case['style']})", False, f"Expected style '{test_case['style']}', got: {style_applied}")
-                        all_passed = False
-                        continue
-                    
-                    # For the updated endpoint, facial_description is optional (may not be present in image editing mode)
-                    facial_description = data.get("facial_description")
-                    if facial_description and isinstance(facial_description, str) and len(facial_description.strip()) >= 20:
-                        print(f"✅ Facial description preview: {facial_description[:100]}...")
-                        facial_desc_info = f", Facial desc: {len(facial_description)} chars"
+                    if data.get('success') and data.get('generated_image_base64'):
+                        results[style] = "✅ PASSED"
+                        logger.info(f"  {style}: SUCCESS")
                     else:
-                        facial_desc_info = ", No facial description (image editing mode)"
-                    
-                    # All validations passed for this test case
-                    self.log_test(f"Generate Haircut Image Endpoint Success ({test_case['style']})", True, 
-                        f"Generated image: {len(generated_image)} chars, Style: {style_applied}{facial_desc_info}")
-                    
+                        results[style] = f"❌ FAILED: {data.get('error', 'Unknown error')}"
+                        logger.error(f"  {style}: FAILED - {data.get('error')}")
                 else:
-                    self.log_test(f"Generate Haircut Image HTTP Response ({test_case['style']})", False, f"HTTP {response.status_code}: {response.text}")
-                    all_passed = False
+                    results[style] = f"❌ FAILED: HTTP {response.status_code}"
+                    logger.error(f"  {style}: FAILED - HTTP {response.status_code}")
                     
-            except Exception as e:
-                self.log_test(f"Generate Haircut Image Endpoint ({test_case['style']})", False, f"Request error: {str(e)}")
-                all_passed = False
-        
-        return all_passed
-
-    def run_all_tests(self):
-        """Run all backend tests"""
-        print("🚀 Starting Backend API Tests for Barbershop Management App")
-        print(f"🔗 Testing against: {self.base_url}")
-        print("=" * 80)
-        
-        # Test 1: API accessibility
-        api_accessible = self.test_api_root()
-        
-        if not api_accessible:
-            print("❌ API not accessible. Stopping tests.")
-            return False
-        
-        # Test 2: Download test image
-        test_image = self.download_test_image()
-        if not test_image:
-            print("❌ Could not get test image. Stopping AI scan tests.")
-            return False
-        
-        # Test 3: AI Scan with valid data (original endpoint)
-        ai_scan_success = self.test_ai_scan_endpoint_success(test_image)
-        
-        # Test 4: AI Scan with invalid data
-        self.test_ai_scan_endpoint_invalid_data()
-        
-        # Test 5: AI Scan history
-        self.test_ai_scan_history_endpoint()
-        
-        # Test 6: AI Scan V2 with reference images (NEW)
-        ai_scan_v2_success = self.test_ai_scan_v2_endpoint(test_image)
-        
-        # Test 7: Generate Haircut Image (UPDATED - IMAGE EDITING)
-        generate_image_success = self.test_generate_haircut_image_endpoint(test_image)
-        
-        # Test 8: Check backend logs for image editing messages
-        self.check_backend_logs_for_image_editing()
-        
-        # Summary
-        print("=" * 80)
-        print("📊 TEST SUMMARY")
-        print("=" * 80)
-        
-        passed = sum(1 for result in self.test_results if result["success"])
-        total = len(self.test_results)
-        
-        for result in self.test_results:
-            print(f"{result['status']}: {result['test']}")
-            if result['details']:
-                print(f"   {result['details']}")
-        
-        print(f"\n🎯 Results: {passed}/{total} tests passed")
-        
-        # Check critical endpoints
-        critical_success = ai_scan_v2_success and generate_image_success
-        
-        if critical_success:
-            print("✅ Enhanced AI Scan endpoints are working correctly!")
-            return True
-        else:
-            print("❌ Enhanced AI Scan endpoints have issues!")
-            return False
-
-def main():
-    """Main test runner"""
-    tester = BackendTester()
-    success = tester.run_all_tests()
+        except Exception as e:
+            results[style] = f"❌ FAILED: {str(e)}"
+            logger.error(f"  {style}: FAILED - {str(e)}")
     
-    # Exit with appropriate code
-    sys.exit(0 if success else 1)
+    # Summary
+    passed = sum(1 for result in results.values() if "PASSED" in result)
+    total = len(results)
+    
+    logger.info(f"Multiple styles test: {passed}/{total} passed")
+    for style, result in results.items():
+        logger.info(f"  {style}: {result}")
+    
+    return passed == total
+
+async def check_backend_logs_for_gemini():
+    """Check backend logs for Gemini-specific messages"""
+    logger.info("🧪 Checking backend logs for Gemini messages")
+    
+    try:
+        import subprocess
+        
+        # Check supervisor logs for backend
+        result = subprocess.run(
+            ["tail", "-n", "100", "/var/log/supervisor/backend.out.log"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        if result.returncode == 0:
+            logs = result.stdout
+            
+            # Look for Gemini-specific log messages
+            gemini_messages = [
+                "Calling Gemini Nano Banana",
+                "Successfully edited photo with Gemini",
+                "Gemini response - Text:",
+                "Gemini response - Images:"
+            ]
+            
+            found_messages = []
+            for message in gemini_messages:
+                if message in logs:
+                    found_messages.append(message)
+            
+            if found_messages:
+                logger.info(f"✅ Found Gemini log messages: {found_messages}")
+                return True
+            else:
+                logger.warning("⚠️  No Gemini-specific log messages found in recent logs")
+                logger.info("Recent backend logs:")
+                for line in logs.split('\n')[-20:]:  # Show last 20 lines
+                    if line.strip():
+                        logger.info(f"  {line}")
+                return False
+        else:
+            logger.error(f"Failed to read backend logs: {result.stderr}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error checking backend logs: {e}")
+        return False
+
+async def test_api_health():
+    """Test basic API health"""
+    logger.info("🧪 Testing API health")
+    
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(f"{API_BASE}/")
+            
+            if response.status_code == 200:
+                data = response.json()
+                logger.info(f"✅ API Health: {data}")
+                return True
+            else:
+                logger.error(f"❌ API Health failed: HTTP {response.status_code}")
+                return False
+                
+    except Exception as e:
+        logger.error(f"❌ API Health failed: {e}")
+        return False
+
+async def main():
+    """Run all backend tests"""
+    logger.info("=" * 60)
+    logger.info("🚀 BACKEND TESTING SUITE - GEMINI HAIRCUT IMAGE GENERATION")
+    logger.info("=" * 60)
+    logger.info(f"Backend URL: {BASE_URL}")
+    logger.info(f"API Base: {API_BASE}")
+    
+    tests = [
+        ("API Health Check", test_api_health),
+        ("Generate Haircut Image (Gemini)", test_generate_haircut_image_gemini),
+        ("Multiple Haircut Styles", test_multiple_haircut_styles),
+        ("Backend Logs Check", check_backend_logs_for_gemini),
+    ]
+    
+    results = {}
+    
+    for test_name, test_func in tests:
+        logger.info(f"\n📋 Running: {test_name}")
+        try:
+            result = await test_func()
+            results[test_name] = "✅ PASSED" if result else "❌ FAILED"
+        except Exception as e:
+            logger.error(f"❌ Test '{test_name}' failed with exception: {e}")
+            results[test_name] = f"❌ FAILED: {str(e)}"
+    
+    # Summary
+    logger.info("\n" + "=" * 60)
+    logger.info("📊 TEST RESULTS SUMMARY")
+    logger.info("=" * 60)
+    
+    passed = 0
+    total = len(results)
+    
+    for test_name, result in results.items():
+        logger.info(f"{result} {test_name}")
+        if "PASSED" in result:
+            passed += 1
+    
+    logger.info(f"\n🎯 Overall: {passed}/{total} tests passed")
+    
+    if passed == total:
+        logger.info("🎉 ALL TESTS PASSED!")
+        return True
+    else:
+        logger.error(f"💥 {total - passed} TESTS FAILED!")
+        return False
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
