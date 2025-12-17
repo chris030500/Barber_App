@@ -1,3 +1,4 @@
+import React, { useMemo, useState } from 'react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
@@ -8,6 +9,7 @@ import {
   ImageBackground,
   TouchableOpacity,
 } from 'react-native';
+import { Redirect, useRouter } from 'expo-router';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -40,6 +42,9 @@ export default function LoginScreen() {
     [authLoading, googleLoading, loading]
   );
 
+  if (!authLoading && user) {
+    return <Redirect href="/" />;
+  }
   useEffect(() => {
     if (authLoading || !user) return;
     if (hasRedirectedRef.current) return;
