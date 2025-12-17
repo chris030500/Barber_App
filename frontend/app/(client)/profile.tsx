@@ -22,10 +22,13 @@ export default function ProfileScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              console.log('🔴 Cerrando sesión...');
               await logout();
-              // La redirección se maneja automáticamente por el AuthContext
+              console.log('✅ Sesión cerrada, redirigiendo...');
+              router.replace('/(auth)/login');
             } catch (error) {
               console.error('Error al cerrar sesión:', error);
+              Alert.alert('Error', 'No se pudo cerrar sesión');
             }
           },
         },
