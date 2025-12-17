@@ -187,8 +187,12 @@ async def get_user(user_id: str):
     return user
 
 @api_router.get("/users", response_model=List[User])
-async def list_users(role: Optional[str] = None, limit: int = 100):
-    query = {"role": role} if role else {}
+async def list_users(role: Optional[str] = None, email: Optional[str] = None, limit: int = 100):
+    query = {}
+    if role:
+        query["role"] = role
+    if email:
+        query["email"] = email
     users = await db.users.find(query, {"_id": 0}).limit(limit).to_list(limit)
     return users
 
