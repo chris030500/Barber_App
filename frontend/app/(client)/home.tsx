@@ -65,7 +65,7 @@ export default function ClientHomeScreen() {
   };
 
   const renderBarbershop = ({ item }: { item: Barbershop }) => (
-    <Card style={styles.shopCard} onPress={() => Alert.alert('Próximamente', 'Ver detalles de barbería')}>
+    <Card style={styles.shopCard}>
       <View style={styles.shopHeader}>
         <Ionicons name="cut" size={40} color="#2563EB" />
         <View style={styles.shopInfo}>
@@ -79,16 +79,9 @@ export default function ClientHomeScreen() {
       )}
       <View style={styles.shopActions}>
         <Button
-          title="Ver Barberos"
-          onPress={() => Alert.alert('Próximamente', 'Ver barberos')}
+          title="📅 Agendar Cita"
+          onPress={() => router.push({ pathname: '/(client)/booking', params: { shop_id: item.shop_id } })}
           variant="primary"
-          size="small"
-          style={styles.actionButton}
-        />
-        <Button
-          title="Agendar"
-          onPress={() => Alert.alert('Próximamente', 'Agendar cita')}
-          variant="outline"
           size="small"
           style={styles.actionButton}
         />
