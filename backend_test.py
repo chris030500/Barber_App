@@ -10,7 +10,7 @@ import sys
 from typing import Dict, Any, List
 
 # Backend URL from the review request
-BACKEND_URL = "https://barbersuite.preview.emergentagent.com"
+BACKEND_URL = "https://barberpro-7.preview.emergentagent.com"
 
 def test_user_endpoint_specific():
     """
