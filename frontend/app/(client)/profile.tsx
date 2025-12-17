@@ -13,47 +13,25 @@ export default function ProfileScreen() {
   const [loggingOut, setLoggingOut] = useState(false);
 
   const handleLogout = async () => {
-    // Use confirm on web, Alert on mobile
-    const shouldLogout = Platform.OS === 'web' 
-      ? window.confirm('¿Estás seguro de que quieres cerrar sesión?')
-      : await new Promise((resolve) => {
-          Alert.alert(
-            'Cerrar sesión',
-            '¿Estás seguro de que quieres cerrar sesión?',
-            [
-              { text: 'Cancelar', onPress: () => resolve(false) },
-              { text: 'Cerrar sesión', onPress: () => resolve(true), style: 'destructive' },
-            ]
-          );
-        });
-    
-    if (!shouldLogout) return;
-    
+    console.log('🔴 handleLogout called');
     setLoggingOut(true);
+    
     try {
-      console.log('🔴 Cerrando sesión...');
+      console.log('🔴 Calling logout...');
       await logout();
-      console.log('✅ Sesión cerrada, forzando recarga...');
-      
-      // Force full page reload to clear all state
-      if (Platform.OS === 'web') {
-        // Clear any cached data
-        if (typeof window !== 'undefined') {
-          window.localStorage.clear();
-          window.sessionStorage.clear();
-          // Force reload to login page
-          window.location.replace('/login');
-        }
-      } else {
-        router.replace('/(auth)/login');
-      }
+      console.log('✅ Logout completed');
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
-      setLoggingOut(false);
-      // Even on error, try to redirect
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        window.location.replace('/login');
-      }
+    }
+    
+    // Always force redirect regardless of success/failure
+    console.log('🔴 Forcing redirect to login...');
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.localStorage.clear();
+      window.sessionStorage.clear();
+      window.location.href = '/login';
+    } else {
+      router.replace('/(auth)/login');
     }
   };
 
