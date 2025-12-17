@@ -449,8 +449,11 @@ class BackendTester:
         # Test 6: AI Scan V2 with reference images (NEW)
         ai_scan_v2_success = self.test_ai_scan_v2_endpoint(test_image)
         
-        # Test 7: Generate Haircut Image (NEW)
+        # Test 7: Generate Haircut Image (UPDATED - IMAGE EDITING)
         generate_image_success = self.test_generate_haircut_image_endpoint(test_image)
+        
+        # Test 8: Check backend logs for image editing messages
+        self.check_backend_logs_for_image_editing()
         
         # Summary
         print("=" * 80)
