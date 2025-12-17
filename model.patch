@@ -1,0 +1,11 @@
+diff --git a/frontend/app/(client)/profile.tsx b/frontend/app/(client)/profile.tsx
+index 83856fb..913df17 100644
+--- a/frontend/app/(client)/profile.tsx
++++ b/frontend/app/(client)/profile.tsx
+@@ -1,5 +1,5 @@
+ import React from 'react';
+-import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
++import { View, Text, StyleSheet, ScrollView, Alert, Image } from 'react-native';
+ import { SafeAreaView } from 'react-native-safe-area-context';
+ import { Ionicons } from '@expo/vector-icons';
+ import { useRouter } from 'expo-router';
