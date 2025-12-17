@@ -9,9 +9,11 @@ import {
   onAuthStateChanged,
   GoogleAuthProvider,
   signInWithCredential,
+  signInWithPopup,
   PhoneAuthProvider,
   signInWithPhoneNumber,
   RecaptchaVerifier,
+  ConfirmationResult,
   User as FirebaseUser,
   updateProfile,
 } from 'firebase/auth';
