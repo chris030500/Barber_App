@@ -54,26 +54,16 @@ export default function RegisterScreen() {
       console.log('🔵 Calling register function...');
       await register(email.trim(), password, name.trim(), role);
       console.log('✅ Register function completed successfully!');
+      console.log('🔵 AuthContext will handle navigation automatically');
       
-      Alert.alert(
-        'Éxito',
-        'Cuenta creada exitosamente',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              console.log('✅ Alert dismissed, navigation should happen via AuthContext');
-            },
-          },
-        ]
-      );
+      // No Alert needed - AuthContext will redirect automatically
+      // User will see loading state and then be redirected to their role's home screen
     } catch (error: any) {
       console.error('❌ Registration failed:', error);
       Alert.alert('Error', error.message || 'Error al crear la cuenta');
-    } finally {
       setLoading(false);
-      console.log('🔵 Registration process ended');
     }
+    // Don't set loading to false on success - let navigation happen
   };
 
   return (
