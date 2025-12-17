@@ -146,9 +146,9 @@ backend:
 
   - task: "Generate Haircut Image Endpoint"
     implemented: true
-    working: true
+    working: false
     file: "/app/backend/server.py"
-    stuck_count: 0
+    stuck_count: 1
     priority: "high"
     needs_retesting: false
     status_history:
@@ -167,6 +167,9 @@ backend:
         - working: true
           agent: "testing"
           comment: "✅ PASSED: IMAGE EDITING ENDPOINT VERIFICATION COMPLETE. Confirmed POST /api/generate-haircut-image uses OpenAI images/edits API via Emergent proxy at https://integrations.emergentagent.com/llm/v1/images/edits. Backend logs show 'Calling image edit API at', 'Image edit API response status: 200', and 'Successfully edited photo' messages. Endpoint EDITS user's photo directly (not generating new person), preserving facial features and only changing hairstyle. Tested with undercut style: success=true, generated_image_base64 (1.89MB), style_applied=undercut. 120-second timeout handled properly. All image editing functionality working as specified."
+        - working: false
+          agent: "testing"
+          comment: "❌ FAILED: Updated endpoint attempting to use 'GEMINI NANO BANANA' for image editing is not working. Tested multiple Gemini model names (gemini-2.5-flash-preview-05-20, gemini-2.5-flash, gemini-2.5-flash-image, gemini-1.5-flash) but all failed with errors: 1) Invalid model name, 2) Text output only, 3) Model not found. Gemini models are designed for text/image analysis, not image generation/editing. Backend logs show 'Gemini image edit failed' messages. Endpoint returns success=false with error 'No se pudo editar la imagen. Intenta con otra foto.' The term 'GEMINI NANO BANANA' appears to be incorrect - Gemini models cannot generate or edit images through multimodal response APIs."
 
 frontend:
   - task: "AI Scan Screen with Reference & Generated Images"
