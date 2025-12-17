@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   ImageBackground,
   TouchableOpacity,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,7 +20,6 @@ import { useAuth } from '../../contexts/AuthContext';
 export default function LoginScreen() {
   const router = useRouter();
   const { login, loginWithGoogle, user, isLoading: authLoading } = useAuth();
-  const hasRedirected = useRef(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,17 +34,14 @@ export default function LoginScreen() {
     }
   };
 
-  useEffect(() => {
-    if (!authLoading && user && !hasRedirected.current) {
-      hasRedirected.current = true;
-      router.replace('/');
-    }
-  }, [authLoading, user]);
-
   const disableActions = useMemo(
     () => loading || googleLoading || authLoading,
     [authLoading, googleLoading, loading]
   );
+
+  if (!authLoading && user) {
+    return <Redirect href="/" />;
+  }
 
   const handleGoogleLogin = async () => {
     if (Platform.OS !== 'web') {
