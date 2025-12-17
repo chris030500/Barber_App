@@ -40,10 +40,12 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string, role: string) => Promise<void>;
-  loginWithPhone: (phoneNumber: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
+  loginWithPhone: (phoneNumber: string) => Promise<string>;
   verifyPhoneCode: (verificationId: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (userData: Partial<User>) => void;
+  confirmationResult: ConfirmationResult | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
