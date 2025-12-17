@@ -6,47 +6,36 @@ import { useAuth } from '../contexts/AuthContext';
 export default function Index() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const [navigationAttempted, setNavigationAttempted] = React.useState(false);
 
   useEffect(() => {
     console.log('🔵 Index: Navigation check', { 
       user: user ? `${user.name} (${user.role})` : 'null', 
-      isLoading,
-      navigationAttempted 
+      isLoading 
     });
     
-    if (!isLoading && !navigationAttempted) {
-      console.log('🔵 Index: Conditions met for navigation');
-      setNavigationAttempted(true);
-      
+    if (!isLoading) {
       if (user) {
         console.log('✅ Index: User authenticated, navigating to role screen...', { role: user.role });
         // Navigate based on user role
         switch (user.role) {
           case 'client':
-            console.log('🔵 Index: Navigating to /(client)/home');
-            setTimeout(() => router.replace('/(client)/home'), 100);
+            router.replace('/(client)/home');
             break;
           case 'barber':
-            console.log('🔵 Index: Navigating to /(barber)/schedule');
-            setTimeout(() => router.replace('/(barber)/schedule'), 100);
+            router.replace('/(barber)/schedule');
             break;
           case 'admin':
-            console.log('🔵 Index: Navigating to /(admin)/dashboard');
-            setTimeout(() => router.replace('/(admin)/dashboard'), 100);
+            router.replace('/(admin)/dashboard');
             break;
           default:
-            console.log('⚠️ Index: Unknown role, navigating to welcome');
-            setTimeout(() => router.replace('/(auth)/welcome'), 100);
+            router.replace('/(auth)/welcome');
         }
       } else {
         console.log('🔵 Index: No user, navigating to welcome');
-        setTimeout(() => router.replace('/(auth)/welcome'), 100);
+        router.replace('/(auth)/welcome');
       }
-    } else {
-      console.log('🔵 Index: Waiting...', { isLoading, navigationAttempted });
     }
-  }, [user, isLoading, navigationAttempted]);
+  }, [user, isLoading]);
 
   return (
     <View style={styles.container}>
