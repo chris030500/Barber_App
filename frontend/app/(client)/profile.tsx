@@ -101,15 +101,18 @@ export default function ProfileScreen() {
           </Card>
         </View>
 
-        <Button
-          title={loggingOut ? "Cerrando sesión..." : "🚪 Cerrar Sesión"}
+        <TouchableOpacity
+          style={[styles.logoutButton, loggingOut && styles.logoutButtonDisabled]}
           onPress={handleLogout}
-          variant="outline"
-          size="large"
-          loading={loggingOut}
           disabled={loggingOut}
-          style={styles.logoutButton}
-        />
+          activeOpacity={0.7}
+        >
+          {loggingOut ? (
+            <ActivityIndicator color="#DC2626" size="small" />
+          ) : (
+            <Text style={styles.logoutButtonText}>🚪 Cerrar Sesión</Text>
+          )}
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
