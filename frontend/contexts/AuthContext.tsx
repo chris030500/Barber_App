@@ -101,24 +101,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (email: string, password: string, name: string, role: string) => {
     try {
+      console.log('🔵 Starting registration...', { email, name, role, BACKEND_URL });
       setIsLoading(true);
+      
+      console.log('🔵 Creating Firebase user...');
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      console.log('✅ Firebase user created:', userCredential.user.uid);
       
       // Update profile with name
+      console.log('🔵 Updating profile with name...');
       await updateProfile(userCredential.user, {
         displayName: name,
       });
+      console.log('✅ Profile updated');
 
       // Create user in backend
+      console.log('🔵 Creating user in backend...', `${BACKEND_URL}/api/users`);
       const response = await axios.post(`${BACKEND_URL}/api/users`, {
         email: email,
         name: name,
         role: role,
       });
+      console.log('✅ Backend user created:', response.data);
       
       setUser(response.data);
+      console.log('✅ Registration completed successfully!');
     } catch (error: any) {
-      console.error('Registration error:', error);
+      console.error('❌ Registration error:', error);
+      console.error('❌ Error details:', error.response?.data || error.message);
       throw new Error(getErrorMessage(error.code));
     } finally {
       setIsLoading(false);
