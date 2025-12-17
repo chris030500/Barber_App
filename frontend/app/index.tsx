@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 export default function Index() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const hasRedirected = useRef(false);
 
   useEffect(() => {
     console.log('🔵 Index: Navigation check', { 
@@ -13,7 +14,8 @@ export default function Index() {
       isLoading 
     });
     
-    if (!isLoading) {
+    if (!isLoading && !hasRedirected.current) {
+      hasRedirected.current = true;
       if (user) {
         console.log('✅ Index: User authenticated, navigating to role screen...', { role: user.role });
         // Navigate based on user role

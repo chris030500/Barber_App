@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ImageBackground } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,9 +10,11 @@ import { useAuth } from '../../contexts/AuthContext';
 export default function WelcomeScreen() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const hasRedirected = useRef(false);
 
   useEffect(() => {
-    if (!isLoading && user) {
+    if (!isLoading && user && !hasRedirected.current) {
+      hasRedirected.current = true;
       router.replace('/');
     }
   }, [isLoading, user]);

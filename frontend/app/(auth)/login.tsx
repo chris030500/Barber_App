@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import { useAuth } from '../../contexts/AuthContext';
 export default function LoginScreen() {
   const router = useRouter();
   const { login, loginWithGoogle, user, isLoading: authLoading } = useAuth();
+  const hasRedirected = useRef(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,7 +36,8 @@ export default function LoginScreen() {
   };
 
   useEffect(() => {
-    if (!authLoading && user) {
+    if (!authLoading && user && !hasRedirected.current) {
+      hasRedirected.current = true;
       router.replace('/');
     }
   }, [authLoading, user]);
