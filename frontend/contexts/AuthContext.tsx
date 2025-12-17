@@ -52,18 +52,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    console.log('🔵 AuthContext: Setting up onAuthStateChanged listener...');
+    
     // Listen to Firebase auth state changes
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      console.log('🔵 onAuthStateChanged triggered!', { fbUser: fbUser ? 'User exists' : 'No user' });
       setFirebaseUser(fbUser);
       
       if (fbUser) {
+        console.log('🔵 User signed in, fetching from backend...', { email: fbUser.email });
         // User is signed in, fetch user data from backend
         try {
+          console.log('🔵 Fetching user from backend:', `${BACKEND_URL}/api/users?email=${fbUser.email}`);
           const response = await axios.get(`${BACKEND_URL}/api/users?email=${fbUser.email}`);
+          console.log('✅ Backend response:', response.data);
           
           if (response.data && response.data.length > 0) {
+            console.log('✅ User found in backend:', response.data[0]);
             setUser(response.data[0]);
           } else {
+            console.log('⚠️ User not found in backend, creating new user...');
             // Create user in backend if doesn't exist
             const newUserResponse = await axios.post(`${BACKEND_URL}/api/users`, {
               email: fbUser.email,
@@ -71,31 +79,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               role: 'client',
               phone: fbUser.phoneNumber || undefined,
             });
+            console.log('✅ New user created:', newUserResponse.data);
             setUser(newUserResponse.data);
           }
         } catch (error) {
-          console.error('Error fetching user data:', error);
+          console.error('❌ Error fetching user data:', error);
         }
       } else {
+        console.log('🔵 No user signed in, clearing user state');
         setUser(null);
       }
       
       setIsLoading(false);
+      console.log('✅ onAuthStateChanged completed, isLoading set to false');
     });
 
-    return () => unsubscribe();
+    return () => {
+      console.log('🔵 Cleaning up onAuthStateChanged listener');
+      unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
     try {
+      console.log('🔵 Login: Starting login process...', { email });
       setIsLoading(true);
+      
+      console.log('🔵 Login: Calling Firebase signInWithEmailAndPassword...');
       await signInWithEmailAndPassword(auth, email, password);
+      console.log('✅ Login: Firebase authentication successful!');
+      console.log('🔵 Login: Waiting for onAuthStateChanged to trigger...');
       // User state will be updated by onAuthStateChanged
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('❌ Login error:', error);
+      console.error('❌ Login error code:', error.code);
       throw new Error(getErrorMessage(error.code));
     } finally {
       setIsLoading(false);
+      console.log('🔵 Login: Process ended, isLoading set to false');
     }
   };
 
