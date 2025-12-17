@@ -732,13 +732,59 @@ class GenerateHaircutImageResponse(BaseModel):
     success: bool
     generated_image_base64: Optional[str] = None
     style_applied: Optional[str] = None
+    facial_description: Optional[str] = None
     error: Optional[str] = None
+
+async def analyze_facial_features(api_key: str, image_base64: str) -> str:
+    """
+    Use Gemini to analyze and describe the user's facial features in detail.
+    This description will be used to generate a similar-looking person with a new haircut.
+    """
+    try:
+        session_id = f"face_analysis_{uuid.uuid4().hex[:8]}"
+        system_message = """Eres un experto en descripción facial para generación de imágenes.
+Tu tarea es describir las características faciales de una persona de manera MUY DETALLADA para que un generador de imágenes pueda crear una imagen similar.
+
+Describe en INGLÉS y de forma muy específica:
+- Ethnicity/skin tone (be specific: light olive, medium brown, pale white, etc.)
+- Face shape (oval, round, square, heart, etc.)
+- Eye shape, color, and size
+- Eyebrow shape and thickness
+- Nose shape and size
+- Lip shape and fullness
+- Jaw and chin structure
+- Any distinctive features (dimples, freckles, beard shadow, etc.)
+- Approximate age range
+- Overall facial structure
+
+Responde SOLO con la descripción física, sin saludos ni explicaciones adicionales.
+Ejemplo: "A 28-year-old Hispanic man with medium olive skin, oval face shape, dark brown almond-shaped eyes..."
+"""
+
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=session_id,
+            system_message=system_message
+        ).with_model("gemini", "gemini-2.5-flash")
+        
+        image_content = ImageContent(image_base64=image_base64)
+        user_message = UserMessage(
+            text="Describe this person's facial features in detail for image generation purposes. Be very specific about skin tone, face shape, eye characteristics, and all distinctive features.",
+            file_contents=[image_content]
+        )
+        
+        response = await chat.send_message(user_message)
+        return response if response else ""
+        
+    except Exception as e:
+        logger.error(f"Error analyzing facial features: {str(e)}")
+        return ""
 
 @api_router.post("/generate-haircut-image", response_model=GenerateHaircutImageResponse)
 async def generate_haircut_image(request: GenerateHaircutImageRequest):
     """
     Generate an AI image showing the user with a specific haircut style.
-    Uses OpenAI gpt-image-1 to create personalized visualizations.
+    First analyzes the user's facial features, then generates a personalized image.
     """
     try:
         api_key = os.environ.get('EMERGENT_LLM_KEY')
@@ -748,22 +794,45 @@ async def generate_haircut_image(request: GenerateHaircutImageRequest):
                 error="Configuración de IA no disponible"
             )
         
-        # Create detailed prompt for image generation
-        style = request.haircut_style
-        details = request.additional_details or ""
+        # Clean base64 image
+        image_data = request.user_image_base64
+        if 'base64,' in image_data:
+            image_data = image_data.split('base64,')[1]
         
-        prompt = f"""Create a professional barbershop portrait photo of a man with a {style} haircut.
-The photo should look like a professional haircut reference photo.
-Style: {style}
-{f'Additional details: {details}' if details else ''}
-The image should be:
-- High quality, well-lit portrait
-- Showing the haircut clearly from a front-facing angle
-- Professional barbershop style photo
-- Clean background
-- The hairstyle should be the main focus"""
+        style = request.haircut_style
+        
+        logger.info(f"Step 1: Analyzing facial features for style: {style}")
+        
+        # Step 1: Analyze the user's facial features using Gemini
+        facial_description = await analyze_facial_features(api_key, image_data)
+        
+        if not facial_description:
+            facial_description = "A man with natural features"
+        
+        logger.info(f"Facial description obtained: {facial_description[:100]}...")
+        
+        # Step 2: Create detailed prompt using the facial description
+        prompt = f"""Create a highly realistic professional barbershop portrait photo.
 
-        logger.info(f"Generating haircut image for style: {style}")
+SUBJECT DESCRIPTION (match these features exactly):
+{facial_description}
+
+HAIRSTYLE TO APPLY:
+{style} haircut - professionally styled and freshly cut
+
+PHOTO REQUIREMENTS:
+- Ultra-realistic photographic portrait
+- Front-facing angle, slightly turned (3/4 view)
+- Professional barbershop lighting (soft, even)
+- Neutral or barbershop background
+- Focus on showing the new hairstyle clearly
+- Same person as described, just with the new haircut
+- High quality, sharp details
+- Natural skin texture and lighting
+
+The result should look like a real "after" photo from a barbershop makeover, showing the same person with their new {style} haircut."""
+
+        logger.info(f"Step 2: Generating image with personalized prompt")
         
         # Initialize image generator
         image_gen = OpenAIImageGeneration(api_key=api_key)
@@ -776,15 +845,15 @@ The image should be:
         )
         
         if images and len(images) > 0:
-            # Convert to base64
             image_base64 = base64.b64encode(images[0]).decode('utf-8')
             
-            logger.info(f"Successfully generated haircut image for style: {style}")
+            logger.info(f"Successfully generated personalized haircut image for style: {style}")
             
             return GenerateHaircutImageResponse(
                 success=True,
                 generated_image_base64=image_base64,
-                style_applied=style
+                style_applied=style,
+                facial_description=facial_description[:200] + "..." if len(facial_description) > 200 else facial_description
             )
         else:
             return GenerateHaircutImageResponse(
