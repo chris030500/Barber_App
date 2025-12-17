@@ -22,22 +22,43 @@ interface Barbershop {
   photos: string[];
 }
 
+interface Appointment {
+  appointment_id: string;
+  scheduled_time: string;
+  status: string;
+}
+
 export default function ClientHomeScreen() {
   const { user } = useAuth();
+  const router = useRouter();
   const [barbershops, setBarbershops] = useState<Barbershop[]>([]);
+  const [nextAppointment, setNextAppointment] = useState<Appointment | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadBarbershops();
-  }, []);
+    loadData();
+  }, [user]);
 
-  const loadBarbershops = async () => {
+  const loadData = async () => {
     try {
-      const response = await axios.get(`${BACKEND_URL}/api/barbershops`);
-      setBarbershops(response.data);
+      const [shopsRes, apptsRes] = await Promise.all([
+        axios.get(`${BACKEND_URL}/api/barbershops`),
+        user ? axios.get(`${BACKEND_URL}/api/appointments`, { 
+          params: { client_user_id: user.user_id, status: 'scheduled' } 
+        }) : Promise.resolve({ data: [] })
+      ]);
+      
+      setBarbershops(shopsRes.data);
+      
+      // Get next upcoming appointment
+      if (apptsRes.data.length > 0) {
+        const sorted = apptsRes.data.sort((a: Appointment, b: Appointment) => 
+          new Date(a.scheduled_time).getTime() - new Date(b.scheduled_time).getTime()
+        );
+        setNextAppointment(sorted[0]);
+      }
     } catch (error) {
-      console.error('Error loading barbershops:', error);
-      Alert.alert('Error', 'No se pudieron cargar las barberías');
+      console.error('Error loading data:', error);
     } finally {
       setLoading(false);
     }
