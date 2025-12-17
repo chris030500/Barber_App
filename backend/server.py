@@ -6,9 +6,11 @@ from typing import List, Optional
 from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 from pathlib import Path
+from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 import os
 import logging
 import uuid
+import base64
 
 # Load environment variables
 ROOT_DIR = Path(__file__).parent
