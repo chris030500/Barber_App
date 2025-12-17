@@ -30,6 +30,8 @@ export default function LoginScreen() {
   };
 
   const handleEmailLogin = async () => {
+    console.log('🔵 Login Screen: handleEmailLogin called');
+    
     if (!email || !password) {
       Alert.alert('Error', 'Por favor completa todos los campos');
       return;
@@ -42,13 +44,21 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
+      console.log('🔵 Login Screen: Calling login function...');
       await login(email.trim(), password);
-      // Navigation will be handled by AuthContext automatically
+      
+      // Wait a bit for AuthContext to update
+      console.log('🔵 Login Screen: Login successful, waiting for user state...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Force navigation to index which will handle routing
+      console.log('🔵 Login Screen: Forcing navigation to index');
+      router.replace('/');
     } catch (error: any) {
+      console.error('❌ Login Screen: Error during login', error);
       Alert.alert('Error', error.message || 'Error al iniciar sesión');
       setLoading(false);
     }
-    // Don't set loading to false on success - let navigation happen
   };
 
   return (

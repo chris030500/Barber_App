@@ -6,39 +6,47 @@ import { useAuth } from '../contexts/AuthContext';
 export default function Index() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const [navigationAttempted, setNavigationAttempted] = React.useState(false);
 
   useEffect(() => {
-    console.log('🔵 Index: Navigation check', { user: user ? `${user.name} (${user.role})` : 'null', isLoading });
+    console.log('🔵 Index: Navigation check', { 
+      user: user ? `${user.name} (${user.role})` : 'null', 
+      isLoading,
+      navigationAttempted 
+    });
     
-    if (!isLoading) {
+    if (!isLoading && !navigationAttempted) {
+      console.log('🔵 Index: Conditions met for navigation');
+      setNavigationAttempted(true);
+      
       if (user) {
         console.log('✅ Index: User authenticated, navigating to role screen...', { role: user.role });
         // Navigate based on user role
         switch (user.role) {
           case 'client':
             console.log('🔵 Index: Navigating to /(client)/home');
-            router.replace('/(client)/home');
+            setTimeout(() => router.replace('/(client)/home'), 100);
             break;
           case 'barber':
             console.log('🔵 Index: Navigating to /(barber)/schedule');
-            router.replace('/(barber)/schedule');
+            setTimeout(() => router.replace('/(barber)/schedule'), 100);
             break;
           case 'admin':
             console.log('🔵 Index: Navigating to /(admin)/dashboard');
-            router.replace('/(admin)/dashboard');
+            setTimeout(() => router.replace('/(admin)/dashboard'), 100);
             break;
           default:
             console.log('⚠️ Index: Unknown role, navigating to welcome');
-            router.replace('/(auth)/welcome');
+            setTimeout(() => router.replace('/(auth)/welcome'), 100);
         }
       } else {
         console.log('🔵 Index: No user, navigating to welcome');
-        router.replace('/(auth)/welcome');
+        setTimeout(() => router.replace('/(auth)/welcome'), 100);
       }
     } else {
-      console.log('🔵 Index: Still loading...');
+      console.log('🔵 Index: Waiting...', { isLoading, navigationAttempted });
     }
-  }, [user, isLoading]);
+  }, [user, isLoading, navigationAttempted]);
 
   return (
     <View style={styles.container}>
