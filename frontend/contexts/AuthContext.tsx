@@ -294,10 +294,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: !!user && !!firebaseUser,
       login,
       register,
+      loginWithGoogle,
       loginWithPhone,
       verifyPhoneCode,
       logout,
-      updateUser
+      updateUser,
+      confirmationResult
     }}>
       {children}
     </AuthContext.Provider>
