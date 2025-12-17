@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Image } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, Alert, Image, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -10,30 +10,42 @@ import { useAuth } from '../../contexts/AuthContext';
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const handleLogout = async () => {
-    Alert.alert(
-      'Cerrar sesión',
-      '¿Estás seguro de que quieres cerrar sesión?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Cerrar sesión',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              console.log('🔴 Cerrando sesión...');
-              await logout();
-              console.log('✅ Sesión cerrada, redirigiendo...');
-              router.replace('/(auth)/login');
-            } catch (error) {
-              console.error('Error al cerrar sesión:', error);
-              Alert.alert('Error', 'No se pudo cerrar sesión');
-            }
-          },
-        },
-      ]
-    );
+    // Use confirm on web, Alert on mobile
+    const shouldLogout = Platform.OS === 'web' 
+      ? window.confirm('¿Estás seguro de que quieres cerrar sesión?')
+      : await new Promise((resolve) => {
+          Alert.alert(
+            'Cerrar sesión',
+            '¿Estás seguro de que quieres cerrar sesión?',
+            [
+              { text: 'Cancelar', onPress: () => resolve(false) },
+              { text: 'Cerrar sesión', onPress: () => resolve(true), style: 'destructive' },
+            ]
+          );
+        });
+    
+    if (!shouldLogout) return;
+    
+    setLoggingOut(true);
+    try {
+      console.log('🔴 Cerrando sesión...');
+      await logout();
+      console.log('✅ Sesión cerrada');
+      
+      // Force navigation to login
+      if (Platform.OS === 'web') {
+        window.location.href = '/login';
+      } else {
+        router.replace('/(auth)/login');
+      }
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+      setLoggingOut(false);
+      Alert.alert('Error', 'No se pudo cerrar sesión');
+    }
   };
 
   return (
