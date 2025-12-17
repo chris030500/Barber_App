@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 export default function Index() {
   const { user, isLoading } = useAuth();
+  const hasRedirected = useRef(false);
 
   const redirectPath = useMemo(() => {
     if (isLoading) return null;
