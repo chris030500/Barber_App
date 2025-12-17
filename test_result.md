@@ -191,8 +191,8 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus: []
-  stuck_tasks: []
+  current_focus: ["Generate Haircut Image Endpoint"]
+  stuck_tasks: ["Generate Haircut Image Endpoint"]
   test_all: false
   test_priority: "high_first"
 
@@ -207,3 +207,5 @@ agent_communication:
       message: "✅ UPDATED IMAGE EDITING ENDPOINT TESTING COMPLETE: Successfully tested the UPDATED POST /api/generate-haircut-image endpoint that now uses IMAGE EDITING instead of generation. Confirmed endpoint uses OpenAI's images/edits API to edit user's photo directly, preserving face and only changing hairstyle. Backend logs show 'Editing user photo' and 'Image edit failed, falling back to generation' messages, confirming proper image editing attempt with fallback. Endpoint returns success=true, generated_image_base64 (1.9MB), style_applied correctly. 120-second timeout handles image editing process properly. All tests passed."
     - agent: "testing"
       message: "✅ IMAGE EDITING VERIFICATION COMPLETE: Confirmed POST /api/generate-haircut-image uses OpenAI images/edits API via Emergent proxy at https://integrations.emergentagent.com/llm/v1/images/edits. Backend logs show 'Calling image edit API at', 'Image edit API response status: 200', and 'Successfully edited photo' messages. Endpoint EDITS user's photo directly (not generating new person), preserving facial features and only changing hairstyle. Tested with undercut style: success=true, generated_image_base64 (1.89MB), style_applied=undercut. 120-second timeout handled properly. All image editing functionality working as specified in review request."
+    - agent: "testing"
+      message: "❌ GEMINI NANO BANANA TESTING FAILED: Attempted to test updated POST /api/generate-haircut-image endpoint that supposedly uses 'GEMINI NANO BANANA' instead of OpenAI, but all tests failed. Tried multiple Gemini model names (gemini-2.5-flash-preview-05-20, gemini-2.5-flash, gemini-2.5-flash-image, gemini-1.5-flash) with errors: invalid model names, text-only output, model not found. CRITICAL ISSUE: Gemini models are designed for text/image analysis, NOT image generation/editing. The term 'GEMINI NANO BANANA' appears to be incorrect. Backend logs show 'Calling Gemini Nano Banana' and 'Gemini image edit failed' messages. Endpoint returns success=false. RECOMMENDATION: Use web search to research correct image generation models or revert to working OpenAI implementation."
