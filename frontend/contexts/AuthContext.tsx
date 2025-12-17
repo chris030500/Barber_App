@@ -159,33 +159,87 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const loginWithPhone = async (phoneNumber: string) => {
+  const loginWithGoogle = async () => {
     try {
+      console.log('🔵 Starting Google Sign-In...');
+      setIsLoading(true);
+      
+      const provider = new GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
+      
+      const result = await signInWithPopup(auth, provider);
+      console.log('✅ Google Sign-In successful:', result.user.email);
+      
+      // User state will be updated by onAuthStateChanged
+    } catch (error: any) {
+      console.error('❌ Google Sign-In error:', error);
+      setIsLoading(false);
+      
+      if (error.code === 'auth/popup-closed-by-user') {
+        throw new Error('Inicio de sesión cancelado');
+      } else if (error.code === 'auth/popup-blocked') {
+        throw new Error('El navegador bloqueó la ventana emergente. Permite popups e intenta de nuevo.');
+      }
+      throw new Error(getErrorMessage(error.code));
+    }
+  };
+
+  const loginWithPhone = async (phoneNumber: string): Promise<string> => {
+    try {
+      console.log('🔵 Starting Phone Sign-In for:', phoneNumber);
+      
+      // Format phone number if needed
+      let formattedPhone = phoneNumber;
+      if (!formattedPhone.startsWith('+')) {
+        formattedPhone = '+52' + formattedPhone; // Default to Mexico
+      }
+      
       if (Platform.OS === 'web') {
-        // For web, use reCAPTCHA
+        // Create invisible reCAPTCHA
+        const recaptchaContainer = document.getElementById('recaptcha-container');
+        if (!recaptchaContainer) {
+          const div = document.createElement('div');
+          div.id = 'recaptcha-container';
+          document.body.appendChild(div);
+        }
+        
         const recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
           size: 'invisible',
+          callback: () => {
+            console.log('✅ reCAPTCHA solved');
+          },
         });
-        const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
-        // Store verification ID for later verification
-        await AsyncStorage.setItem('verificationId', confirmationResult.verificationId);
+        
+        const result = await signInWithPhoneNumber(auth, formattedPhone, recaptchaVerifier);
+        console.log('✅ SMS sent successfully');
+        
+        setConfirmationResult(result);
+        return result.verificationId;
       } else {
-        // For native, phone auth requires additional setup
-        // This is a placeholder - full implementation would need React Native Firebase
-        throw new Error('Phone authentication on mobile requires additional setup');
+        throw new Error('La autenticación por teléfono en móvil requiere configuración adicional');
       }
     } catch (error: any) {
-      console.error('Phone login error:', error);
+      console.error('❌ Phone login error:', error);
       throw new Error(getErrorMessage(error.code));
     }
   };
 
   const verifyPhoneCode = async (verificationId: string, code: string) => {
     try {
-      const credential = PhoneAuthProvider.credential(verificationId, code);
-      await signInWithCredential(auth, credential);
+      console.log('🔵 Verifying phone code...');
+      
+      if (confirmationResult) {
+        await confirmationResult.confirm(code);
+        console.log('✅ Phone verification successful');
+      } else {
+        const credential = PhoneAuthProvider.credential(verificationId, code);
+        await signInWithCredential(auth, credential);
+      }
+      
+      // User state will be updated by onAuthStateChanged
     } catch (error: any) {
-      console.error('Verification error:', error);
+      console.error('❌ Verification error:', error);
       throw new Error(getErrorMessage(error.code));
     }
   };
