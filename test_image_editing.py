@@ -73,34 +73,38 @@ class ImageEditingTester:
         try:
             print("🔍 Checking backend logs for image editing messages...")
             
-            # Check backend logs for specific messages
-            result = subprocess.run(
-                ["tail", "-n", "100", "/var/log/supervisor/backend.out.log"],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
+            # Check both output and error logs for specific messages
+            log_files = ["/var/log/supervisor/backend.out.log", "/var/log/supervisor/backend.err.log"]
+            all_log_content = ""
             
-            if result.returncode == 0:
-                log_content = result.stdout
-                print(f"📋 Recent backend log entries (last 100 lines):")
-                print(log_content[-500:])  # Show last 500 chars
+            for log_file in log_files:
+                result = subprocess.run(
+                    ["tail", "-n", "50", log_file],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
                 
-                # Look for specific messages mentioned in review request
-                editing_found = "Editing user photo" in log_content
-                edit_failed_found = "Image edit failed" in log_content
-                
-                if editing_found:
-                    self.log_test("Backend Log - Image Editing", True, "Found 'Editing user photo' message in logs")
-                    return True
-                elif edit_failed_found:
-                    self.log_test("Backend Log - Image Edit Failed", True, "Found 'Image edit failed' message in logs (fallback to generation)")
-                    return True
-                else:
-                    self.log_test("Backend Log - Image Editing Messages", False, "No 'Editing user photo' or 'Image edit failed' messages found in recent logs")
-                    return False
+                if result.returncode == 0:
+                    all_log_content += result.stdout + "\n"
+            
+            print(f"📋 Checking recent backend log entries...")
+            
+            # Look for specific messages mentioned in review request
+            editing_found = "Editing user photo" in all_log_content
+            edit_failed_found = "Image edit failed" in all_log_content
+            
+            if editing_found and edit_failed_found:
+                self.log_test("Backend Log - Image Editing Process", True, "Found both 'Editing user photo' and 'Image edit failed' messages - endpoint correctly tries editing first, then falls back to generation")
+                return True
+            elif editing_found:
+                self.log_test("Backend Log - Image Editing", True, "Found 'Editing user photo' message in logs")
+                return True
+            elif edit_failed_found:
+                self.log_test("Backend Log - Image Edit Failed", True, "Found 'Image edit failed' message in logs (fallback to generation)")
+                return True
             else:
-                self.log_test("Backend Log Check", False, f"Could not read backend logs: {result.stderr}")
+                self.log_test("Backend Log - Image Editing Messages", False, "No 'Editing user photo' or 'Image edit failed' messages found in recent logs")
                 return False
                 
         except Exception as e:
