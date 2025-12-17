@@ -368,7 +368,7 @@ class BackendTester:
             print("❌ Could not get test image. Stopping AI scan tests.")
             return False
         
-        # Test 3: AI Scan with valid data
+        # Test 3: AI Scan with valid data (original endpoint)
         ai_scan_success = self.test_ai_scan_endpoint_success(test_image)
         
         # Test 4: AI Scan with invalid data
@@ -376,6 +376,12 @@ class BackendTester:
         
         # Test 5: AI Scan history
         self.test_ai_scan_history_endpoint()
+        
+        # Test 6: AI Scan V2 with reference images (NEW)
+        ai_scan_v2_success = self.test_ai_scan_v2_endpoint(test_image)
+        
+        # Test 7: Generate Haircut Image (NEW)
+        generate_image_success = self.test_generate_haircut_image_endpoint(test_image)
         
         # Summary
         print("=" * 80)
@@ -392,11 +398,14 @@ class BackendTester:
         
         print(f"\n🎯 Results: {passed}/{total} tests passed")
         
-        if ai_scan_success:
-            print("✅ AI Scan endpoint is working correctly!")
+        # Check critical endpoints
+        critical_success = ai_scan_v2_success and generate_image_success
+        
+        if critical_success:
+            print("✅ Enhanced AI Scan endpoints are working correctly!")
             return True
         else:
-            print("❌ AI Scan endpoint has issues!")
+            print("❌ Enhanced AI Scan endpoints have issues!")
             return False
 
 def main():
