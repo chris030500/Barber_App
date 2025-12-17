@@ -498,7 +498,7 @@ CONSEJOS_ADICIONALES:
         # Create user message with image
         user_message = UserMessage(
             text="Analiza esta foto de mi rostro y recomiéndame los mejores estilos de corte de cabello que complementen mis rasgos faciales. Proporciona al menos 3 recomendaciones específicas.",
-            image_content=image_content
+            file_contents=[image_content]
         )
         
         # Send message to Gemini
