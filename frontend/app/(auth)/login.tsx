@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +10,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +22,7 @@ import { useAuth } from '../../contexts/AuthContext';
 export default function LoginScreen() {
   const router = useRouter();
   const { login, loginWithGoogle, user, isLoading: authLoading } = useAuth();
+  const hasRedirectedRef = useRef(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,6 +45,13 @@ export default function LoginScreen() {
   if (!authLoading && user) {
     return <Redirect href="/" />;
   }
+  useEffect(() => {
+    if (authLoading || !user) return;
+    if (hasRedirectedRef.current) return;
+
+    hasRedirectedRef.current = true;
+    router.replace('/');
+  }, [authLoading, router, user]);
 
   const handleGoogleLogin = async () => {
     if (Platform.OS !== 'web') {
