@@ -737,7 +737,7 @@ class GenerateHaircutImageResponse(BaseModel):
     error: Optional[str] = None
 
 # Emergent proxy URL for API calls
-EMERGENT_PROXY_URL = "https://ai-proxy.i.e2b.dev/llm"
+EMERGENT_PROXY_URL = "https://integrations.emergentagent.com/llm"
 
 async def edit_image_with_haircut(api_key: str, image_base64: str, haircut_style: str) -> Optional[bytes]:
     """
@@ -783,7 +783,7 @@ CRITICAL INSTRUCTIONS:
             else:
                 api_url = "https://api.openai.com/v1/images/edits"
             
-            logger.info(f"Calling image edit API for style: {haircut_style}")
+            logger.info(f"Calling image edit API at: {api_url}")
             
             response = await client.post(
                 api_url,
@@ -791,6 +791,8 @@ CRITICAL INSTRUCTIONS:
                 data=data,
                 headers=headers
             )
+            
+            logger.info(f"Image edit API response status: {response.status_code}")
             
             if response.status_code == 200:
                 result = response.json()
@@ -801,18 +803,22 @@ CRITICAL INSTRUCTIONS:
                     
                     # Handle b64_json response
                     if img_data.get('b64_json'):
+                        logger.info("Got b64_json response from edit API")
                         return base64.b64decode(img_data['b64_json'])
                     # Handle URL response
                     elif img_data.get('url'):
+                        logger.info("Got URL response from edit API, fetching image...")
                         img_response = await client.get(img_data['url'])
                         return img_response.content
                         
             else:
-                logger.error(f"Image edit API error: {response.status_code} - {response.text}")
+                logger.error(f"Image edit API error: {response.status_code} - {response.text[:500]}")
                 return None
                 
     except Exception as e:
         logger.error(f"Error in edit_image_with_haircut: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         return None
     
     return None
