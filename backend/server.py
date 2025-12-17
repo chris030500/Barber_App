@@ -734,59 +734,94 @@ class GenerateHaircutImageResponse(BaseModel):
     success: bool
     generated_image_base64: Optional[str] = None
     style_applied: Optional[str] = None
-    facial_description: Optional[str] = None
     error: Optional[str] = None
 
-async def analyze_facial_features(api_key: str, image_base64: str) -> str:
+# Emergent proxy URL for API calls
+EMERGENT_PROXY_URL = "https://ai-proxy.i.e2b.dev/llm"
+
+async def edit_image_with_haircut(api_key: str, image_base64: str, haircut_style: str) -> Optional[bytes]:
     """
-    Use Gemini to analyze and describe the user's facial features in detail.
-    This description will be used to generate a similar-looking person with a new haircut.
+    Use OpenAI's image edit API to modify the user's photo with a new hairstyle.
+    This preserves the user's face and only changes the hair.
     """
     try:
-        session_id = f"face_analysis_{uuid.uuid4().hex[:8]}"
-        system_message = """Eres un experto en descripción facial para generación de imágenes.
-Tu tarea es describir las características faciales de una persona de manera MUY DETALLADA para que un generador de imágenes pueda crear una imagen similar.
-
-Describe en INGLÉS y de forma muy específica:
-- Ethnicity/skin tone (be specific: light olive, medium brown, pale white, etc.)
-- Face shape (oval, round, square, heart, etc.)
-- Eye shape, color, and size
-- Eyebrow shape and thickness
-- Nose shape and size
-- Lip shape and fullness
-- Jaw and chin structure
-- Any distinctive features (dimples, freckles, beard shadow, etc.)
-- Approximate age range
-- Overall facial structure
-
-Responde SOLO con la descripción física, sin saludos ni explicaciones adicionales.
-Ejemplo: "A 28-year-old Hispanic man with medium olive skin, oval face shape, dark brown almond-shaped eyes..."
-"""
-
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=session_id,
-            system_message=system_message
-        ).with_model("gemini", "gemini-2.5-flash")
+        # Decode base64 to bytes
+        image_bytes = base64.b64decode(image_base64)
         
-        image_content = ImageContent(image_base64=image_base64)
-        user_message = UserMessage(
-            text="Describe this person's facial features in detail for image generation purposes. Be very specific about skin tone, face shape, eye characteristics, and all distinctive features.",
-            file_contents=[image_content]
-        )
-        
-        response = await chat.send_message(user_message)
-        return response if response else ""
-        
+        # Prepare the edit prompt - focused on ONLY changing the hair
+        edit_prompt = f"""Edit ONLY the hair in this photo. Apply a professional {haircut_style} hairstyle/haircut.
+
+CRITICAL INSTRUCTIONS:
+- Keep the person's face, skin, eyes, nose, mouth, ears EXACTLY the same
+- Do NOT change facial features, expression, or skin tone
+- ONLY modify the hair/hairstyle
+- Make it look like a professional barbershop result
+- The {haircut_style} should look natural and well-styled
+- Maintain the same lighting and photo quality
+- Keep the same background and clothing"""
+
+        # Use httpx for async request to OpenAI API via Emergent proxy
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            # Prepare multipart form data
+            files = {
+                'image': ('photo.png', BytesIO(image_bytes), 'image/png'),
+            }
+            data = {
+                'model': 'gpt-image-1',
+                'prompt': edit_prompt,
+                'n': '1',
+                'size': '1024x1024',
+            }
+            
+            headers = {
+                'Authorization': f'Bearer {api_key}',
+            }
+            
+            # Determine the correct API endpoint
+            if api_key.startswith("sk-emergent-"):
+                api_url = f"{EMERGENT_PROXY_URL}/v1/images/edits"
+            else:
+                api_url = "https://api.openai.com/v1/images/edits"
+            
+            logger.info(f"Calling image edit API for style: {haircut_style}")
+            
+            response = await client.post(
+                api_url,
+                files=files,
+                data=data,
+                headers=headers
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                
+                # Get the edited image
+                if result.get('data') and len(result['data']) > 0:
+                    img_data = result['data'][0]
+                    
+                    # Handle b64_json response
+                    if img_data.get('b64_json'):
+                        return base64.b64decode(img_data['b64_json'])
+                    # Handle URL response
+                    elif img_data.get('url'):
+                        img_response = await client.get(img_data['url'])
+                        return img_response.content
+                        
+            else:
+                logger.error(f"Image edit API error: {response.status_code} - {response.text}")
+                return None
+                
     except Exception as e:
-        logger.error(f"Error analyzing facial features: {str(e)}")
-        return ""
+        logger.error(f"Error in edit_image_with_haircut: {str(e)}")
+        return None
+    
+    return None
 
 @api_router.post("/generate-haircut-image", response_model=GenerateHaircutImageResponse)
 async def generate_haircut_image(request: GenerateHaircutImageRequest):
     """
-    Generate an AI image showing the user with a specific haircut style.
-    First analyzes the user's facial features, then generates a personalized image.
+    Edit the user's photo to show them with a specific haircut style.
+    Uses OpenAI's image edit API to preserve facial features and only change the hair.
     """
     try:
         api_key = os.environ.get('EMERGENT_LLM_KEY')
@@ -803,71 +838,56 @@ async def generate_haircut_image(request: GenerateHaircutImageRequest):
         
         style = request.haircut_style
         
-        logger.info(f"Step 1: Analyzing facial features for style: {style}")
+        logger.info(f"Editing user photo with haircut style: {style}")
         
-        # Step 1: Analyze the user's facial features using Gemini
-        facial_description = await analyze_facial_features(api_key, image_data)
+        # Try to edit the image directly
+        edited_image = await edit_image_with_haircut(api_key, image_data, style)
         
-        if not facial_description:
-            facial_description = "A man with natural features"
-        
-        logger.info(f"Facial description obtained: {facial_description[:100]}...")
-        
-        # Step 2: Create detailed prompt using the facial description
-        prompt = f"""Create a highly realistic professional barbershop portrait photo.
-
-SUBJECT DESCRIPTION (match these features exactly):
-{facial_description}
-
-HAIRSTYLE TO APPLY:
-{style} haircut - professionally styled and freshly cut
-
-PHOTO REQUIREMENTS:
-- Ultra-realistic photographic portrait
-- Front-facing angle, slightly turned (3/4 view)
-- Professional barbershop lighting (soft, even)
-- Neutral or barbershop background
-- Focus on showing the new hairstyle clearly
-- Same person as described, just with the new haircut
-- High quality, sharp details
-- Natural skin texture and lighting
-
-The result should look like a real "after" photo from a barbershop makeover, showing the same person with their new {style} haircut."""
-
-        logger.info(f"Step 2: Generating image with personalized prompt")
-        
-        # Initialize image generator
-        image_gen = OpenAIImageGeneration(api_key=api_key)
-        
-        # Generate image
-        images = await image_gen.generate_images(
-            prompt=prompt,
-            model="gpt-image-1",
-            number_of_images=1
-        )
-        
-        if images and len(images) > 0:
-            image_base64 = base64.b64encode(images[0]).decode('utf-8')
+        if edited_image:
+            image_base64_result = base64.b64encode(edited_image).decode('utf-8')
             
-            logger.info(f"Successfully generated personalized haircut image for style: {style}")
+            logger.info(f"Successfully edited photo with haircut style: {style}")
             
             return GenerateHaircutImageResponse(
                 success=True,
-                generated_image_base64=image_base64,
-                style_applied=style,
-                facial_description=facial_description[:200] + "..." if len(facial_description) > 200 else facial_description
+                generated_image_base64=image_base64_result,
+                style_applied=style
             )
         else:
+            # Fallback: If edit fails, try generation with detailed description
+            logger.warning(f"Image edit failed, falling back to generation for style: {style}")
+            
+            # Use generation as fallback
+            image_gen = OpenAIImageGeneration(api_key=api_key)
+            
+            prompt = f"""Professional barbershop portrait photo of a man with a {style} haircut.
+High quality, well-lit, front-facing angle. Focus on showing the {style} hairstyle clearly.
+Professional barbershop style photo with clean background."""
+            
+            images = await image_gen.generate_images(
+                prompt=prompt,
+                model="gpt-image-1",
+                number_of_images=1
+            )
+            
+            if images and len(images) > 0:
+                image_base64_result = base64.b64encode(images[0]).decode('utf-8')
+                return GenerateHaircutImageResponse(
+                    success=True,
+                    generated_image_base64=image_base64_result,
+                    style_applied=style
+                )
+            
             return GenerateHaircutImageResponse(
                 success=False,
-                error="No se pudo generar la imagen"
+                error="No se pudo editar ni generar la imagen"
             )
             
     except Exception as e:
-        logger.error(f"Error generating haircut image: {str(e)}")
+        logger.error(f"Error in generate_haircut_image: {str(e)}")
         return GenerateHaircutImageResponse(
             success=False,
-            error=f"Error al generar imagen: {str(e)}"
+            error=f"Error al procesar imagen: {str(e)}"
         )
 
 # Include router in app
