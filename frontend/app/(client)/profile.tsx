@@ -118,10 +118,12 @@ export default function ProfileScreen() {
         </View>
 
         <Button
-          title="🚪 Cerrar Sesión"
+          title={loggingOut ? "Cerrando sesión..." : "🚪 Cerrar Sesión"}
           onPress={handleLogout}
           variant="outline"
           size="large"
+          loading={loggingOut}
+          disabled={loggingOut}
           style={styles.logoutButton}
         />
       </ScrollView>
