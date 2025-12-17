@@ -38,7 +38,7 @@ export default function LoginScreen() {
     if (!authLoading && user) {
       router.replace('/');
     }
-  }, [authLoading, router, user]);
+  }, [authLoading, user]);
 
   const disableActions = useMemo(
     () => loading || googleLoading || authLoading,

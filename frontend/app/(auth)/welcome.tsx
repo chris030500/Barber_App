@@ -15,7 +15,7 @@ export default function WelcomeScreen() {
     if (!isLoading && user) {
       router.replace('/');
     }
-  }, [isLoading, router, user]);
+  }, [isLoading, user]);
 
   return (
     <ImageBackground
