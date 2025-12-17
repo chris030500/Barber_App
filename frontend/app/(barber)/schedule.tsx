@@ -122,9 +122,16 @@ export default function BarberScheduleScreen() {
         )}
         <View style={styles.appointmentActions}>
           <Button
-            title="Completar"
-            onPress={() => Alert.alert('Funcionalidad', 'Marcar como completada')}
+            title="✓ Completar"
+            onPress={() => completeAppointment(item.appointment_id)}
             variant="primary"
+            size="small"
+            style={styles.actionButton}
+          />
+          <Button
+            title="✕ Cancelar"
+            onPress={() => cancelAppointment(item.appointment_id)}
+            variant="outline"
             size="small"
             style={styles.actionButton}
           />
