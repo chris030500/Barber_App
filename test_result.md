@@ -161,6 +161,9 @@ backend:
         - working: true
           agent: "testing"
           comment: "✅ PASSED: IMPROVED Generate Haircut Image endpoint tested successfully. Now performs 2-step process: 1) Analyzes facial features using Gemini (facial_description field), 2) Generates personalized image using that description + haircut style. All required fields present: success, generated_image_base64 (2.7MB+), style_applied, facial_description (200+ chars). Tested fade, undercut, pompadour styles. 120-second timeout handled properly for dual AI calls."
+        - working: true
+          agent: "testing"
+          comment: "✅ PASSED: UPDATED Generate Haircut Image endpoint with IMAGE EDITING functionality tested successfully. Endpoint now uses OpenAI's images/edits API to EDIT user's photo directly, preserving face and only changing hairstyle. Falls back to generation if edit fails. Backend logs confirm: 'Editing user photo' and 'Image edit failed, falling back to generation' messages present. Returns success=true, generated_image_base64 (1.9MB+), style_applied=fade. 120-second timeout handled properly for image editing process."
 
 frontend:
   - task: "AI Scan Screen with Reference & Generated Images"
