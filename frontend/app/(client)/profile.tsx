@@ -203,5 +203,22 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     marginTop: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#DC2626',
+    backgroundColor: '#FEF2F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 56,
+  },
+  logoutButtonDisabled: {
+    opacity: 0.6,
+  },
+  logoutButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#DC2626',
   },
 });
