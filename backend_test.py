@@ -192,6 +192,43 @@ class BackendTester:
             self.log_test("AI Scan Invalid Data Test", False, f"Unexpected error: {str(e)}")
             return False
 
+    def check_backend_logs_for_image_editing(self):
+        """Check backend logs for image editing messages"""
+        try:
+            print("🔍 Checking backend logs for image editing messages...")
+            
+            # Check backend logs for specific messages
+            result = subprocess.run(
+                ["tail", "-n", "50", "/var/log/supervisor/backend.out.log"],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if result.returncode == 0:
+                log_content = result.stdout
+                
+                # Look for specific messages mentioned in review request
+                editing_found = "Editing user photo" in log_content
+                edit_failed_found = "Image edit failed" in log_content
+                
+                if editing_found:
+                    self.log_test("Backend Log - Image Editing", True, "Found 'Editing user photo' message in logs")
+                    return True
+                elif edit_failed_found:
+                    self.log_test("Backend Log - Image Edit Failed", True, "Found 'Image edit failed' message in logs (fallback to generation)")
+                    return True
+                else:
+                    self.log_test("Backend Log - Image Editing Messages", False, "No 'Editing user photo' or 'Image edit failed' messages found in recent logs")
+                    return False
+            else:
+                self.log_test("Backend Log Check", False, f"Could not read backend logs: {result.stderr}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Backend Log Check", False, f"Error checking logs: {str(e)}")
+            return False
+
     def test_ai_scan_history_endpoint(self):
         """Test AI scan history endpoint"""
         try:
