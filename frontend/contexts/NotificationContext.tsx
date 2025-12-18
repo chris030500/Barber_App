@@ -6,13 +6,17 @@ import Constants from 'expo-constants';
 import axios from 'axios';
 import { BACKEND_URL } from '../utils/backendUrl';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+const isWeb = Platform.OS === 'web';
+
+if (!isWeb) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
+}
 
 interface NotificationContextType {
   expoPushToken: string | null;
@@ -26,11 +30,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
   const [notification, setNotification] = useState<Notifications.Notification | null>(null);
 
+  const expoPushTokenRef = useRef<string | null>(null);
   const registeringRef = useRef(false);
   const lastRegisteredUserRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (Platform.OS === 'web') return;
+    if (isWeb) return;
 
     let isMounted = true;
 
@@ -53,7 +58,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const registerForPushNotifications = useCallback(async (userId: string) => {
     if (!userId) return;
 
-    if (lastRegisteredUserRef.current === userId && expoPushToken) {
+    if (isWeb) {
+      // Short-circuit on web to avoid unsupported APIs and render loops
+      return;
+    }
+
+    if (lastRegisteredUserRef.current === userId && expoPushTokenRef.current) {
       return;
     }
 
@@ -61,8 +71,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     registeringRef.current = true;
 
     try {
-      if (Platform.OS === 'web') return;
-
       if (!Device.isDevice) {
         console.log('Must use physical device for push notifications');
         return;
@@ -97,6 +105,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
       const token = await Notifications.getExpoPushTokenAsync({ projectId });
 
+      expoPushTokenRef.current = token.data;
       setExpoPushToken(token.data);
       lastRegisteredUserRef.current = userId;
 
@@ -112,7 +121,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     } finally {
       registeringRef.current = false;
     }
-  }, [expoPushToken]);
+  }, []);
 
   const value = useMemo(
     () => ({ expoPushToken, notification, registerForPushNotifications }),
