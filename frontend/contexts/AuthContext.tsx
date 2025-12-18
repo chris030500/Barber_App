@@ -261,10 +261,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await firebaseSignOut(auth);
-    setUser(null);
-    setFirebaseUser(null);
-    await AsyncStorage.removeItem('user');
+    try {
+      setAuthLoading(true);
+      await firebaseSignOut(auth);
+    } catch (error) {
+      console.error('❌ Logout error:', error);
+    } finally {
+      setUser(null);
+      setFirebaseUser(null);
+      await AsyncStorage.removeItem('user');
+      setAuthLoading(false);
+    }
   };
 
   const updateUser = (userData: Partial<User>) => {
