@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Alert, ImageBackground, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, Alert, ImageBackground, TouchableOpacity } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -8,21 +8,9 @@ import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import { useAuth } from '../../contexts/AuthContext';
 import { getRedirectPath } from '../../utils/navigation';
+import { shadows } from '../../styles/theme';
 
-const roleShadow = Platform.select({
-  ios: {
-    shadowColor: '#8B5CF6',
-    shadowOpacity: 0.18,
-    shadowOffset: { width: 0, height: 8 },
-    shadowRadius: 18
-  },
-  android: {
-    elevation: 10
-  },
-  web: {
-    boxShadow: '0 12px 24px rgba(139, 92, 246, 0.18)'
-  }
-});
+const roleShadow = shadows.accent;
 
 export default function RegisterScreen() {
   const router = useRouter();

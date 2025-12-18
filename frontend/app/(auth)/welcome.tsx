@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ImageBackground, Platform } from 'react-native';
+import { View, Text, StyleSheet, ImageBackground } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,28 +7,10 @@ import { StatusBar } from 'expo-status-bar';
 import Button from '../../components/ui/Button';
 import { useAuth } from '../../contexts/AuthContext';
 import { getRedirectPath } from '../../utils/navigation';
+import { shadows } from '../../styles/theme';
 
-const badgeShadow = Platform.select({
-  ios: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20
-  },
-  android: { elevation: 6 },
-  web: { boxShadow: '0 10px 20px rgba(0, 0, 0, 0.15)' }
-});
-
-const tileShadow = Platform.select({
-  ios: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 18
-  },
-  android: { elevation: 8 },
-  web: { boxShadow: '0 12px 24px rgba(0, 0, 0, 0.18)' }
-});
+const badgeShadow = shadows.soft;
+const tileShadow = shadows.elevated;
 
 export default function WelcomeScreen() {
   const router = useRouter();

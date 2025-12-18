@@ -8,7 +8,6 @@ import {
   Alert,
   ActivityIndicator
 } from 'react-native';
-import { Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -19,24 +18,9 @@ import { es } from 'date-fns/locale';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { useAuth } from '../../contexts/AuthContext';
-import { palette, typography } from '../../styles/theme';
+import { palette, shadows, typography } from '../../styles/theme';
 
 const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || process.env.EXPO_PUBLIC_BACKEND_URL;
-
-const optionShadow = Platform.select({
-  ios: {
-    shadowColor: palette.accent,
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 8 }
-  },
-  android: {
-    elevation: 6
-  },
-  web: {
-    boxShadow: '0 10px 20px rgba(139, 92, 246, 0.25)'
-  }
-});
 
 interface Service {
   service_id: string;
@@ -549,7 +533,7 @@ const styles = StyleSheet.create({
   },
   optionCardSelected: {
     borderColor: palette.accent,
-    ...optionShadow,
+    ...shadows.accent,
   },
   optionHeader: {
     flexDirection: 'row',

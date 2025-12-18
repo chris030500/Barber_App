@@ -17,28 +17,10 @@ import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import { useAuth } from '../../contexts/AuthContext';
 import { getRedirectPath } from '../../utils/navigation';
+import { shadows } from '../../styles/theme';
 
-const badgeShadow = Platform.select({
-  ios: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20
-  },
-  android: { elevation: 6 },
-  web: { boxShadow: '0 10px 20px rgba(0, 0, 0, 0.15)' }
-});
-
-const cardShadow = Platform.select({
-  ios: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.3,
-    shadowRadius: 24
-  },
-  android: { elevation: 10 },
-  web: { boxShadow: '0 18px 32px rgba(0, 0, 0, 0.28)' }
-});
+const badgeShadow = shadows.soft;
+const cardShadow = shadows.elevated;
 
 export default function LoginScreen() {
   const router = useRouter();
