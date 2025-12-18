@@ -322,34 +322,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       case 'auth/too-many-requests':
         return 'Demasiados intentos. Intenta más tarde';
       default:
-        return 'Error de autenticación. Intenta nuevamente';
+        return '/(auth)/welcome';
     }
-  };
+  }, [isLoading, user]);
 
-  return (
-    <AuthContext.Provider value={{
-      user,
-      firebaseUser,
-      isLoading,
-      isAuthenticated: !!user && !!firebaseUser,
-      login,
-      register,
-      loginWithGoogle,
-      loginWithPhone,
-      verifyPhoneCode,
-      logout,
-      updateUser,
-      confirmationResult
-    }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+  if (!redirectPath) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#2563EB" />
+        <Text style={styles.text}>Cargando...</Text>
+      </View>
+    );
   }
-  return context;
+
+  return <Redirect href={redirectPath} />;
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: palette.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  text: {
+    marginTop: 12,
+    ...typography.subheading,
+    color: palette.textSecondary,
+  },
+});
