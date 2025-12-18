@@ -24,18 +24,16 @@ export default function Index() {
     }
   }, [isLoading, user]);
 
-  if (redirectPath) {
-    return <Redirect href={redirectPath} />;
+  if (!redirectPath) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#2563EB" />
+        <Text style={styles.text}>Cargando...</Text>
+      </View>
+    );
   }
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.loaderCard}>
-        <ActivityIndicator size="large" color={palette.accent} />
-        <Text style={styles.text}>Cargando experiencia...</Text>
-      </View>
-    </View>
-  );
+  return <Redirect href={redirectPath} />;
 }
 
 const styles = StyleSheet.create({
