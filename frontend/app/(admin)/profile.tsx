@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import Card from '../../components/ui/Card';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function AdminProfileScreen() {
   const { user, logout } = useAuth();
+  const router = useRouter();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = () => {
     Alert.alert(
@@ -14,7 +17,25 @@ export default function AdminProfileScreen() {
       '¿Estás seguro que deseas cerrar sesión?',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Cerrar Sesión', style: 'destructive', onPress: logout }
+        {
+          text: 'Cerrar Sesión',
+          style: 'destructive',
+          onPress: async () => {
+            if (isLoggingOut) return;
+
+            try {
+              console.log('🔵 AdminProfile: confirmando cierre de sesión');
+              setIsLoggingOut(true);
+              await logout();
+              router.replace('/login');
+            } catch (error) {
+              console.error('❌ Error al cerrar sesión:', error);
+              Alert.alert('Error', 'No se pudo cerrar sesión. Intenta de nuevo.');
+            } finally {
+              setIsLoggingOut(false);
+            }
+          }
+        }
       ]
     );
   };
@@ -100,9 +121,11 @@ export default function AdminProfileScreen() {
         </Card>
 
         {/* Logout Button */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={24} color="#EF4444" />
-          <Text style={styles.logoutText}>Cerrar Sesión</Text>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} disabled={isLoggingOut}>
+          <Ionicons name="log-out-outline" size={24} color={isLoggingOut ? '#FCA5A5' : '#EF4444'} />
+          <Text style={[styles.logoutText, isLoggingOut && { color: '#FCA5A5' }]}>
+            {isLoggingOut ? 'Cerrando sesión...' : 'Cerrar Sesión'}
+          </Text>
         </TouchableOpacity>
 
         <View style={styles.footer}>
