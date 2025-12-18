@@ -261,15 +261,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    console.log('🔵 Logout: iniciando proceso de cierre de sesión');
+    setAuthLoading(true);
+
+    // Limpia el estado local primero para evitar que la UI quede bloqueada si Firebase falla
+    setUser(null);
+    setFirebaseUser(null);
+    await AsyncStorage.removeItem('user');
+
     try {
-      setAuthLoading(true);
       await firebaseSignOut(auth);
+      console.log('✅ Logout: sesión de Firebase cerrada');
     } catch (error) {
       console.error('❌ Logout error:', error);
     } finally {
-      setUser(null);
-      setFirebaseUser(null);
-      await AsyncStorage.removeItem('user');
       setAuthLoading(false);
     }
   };

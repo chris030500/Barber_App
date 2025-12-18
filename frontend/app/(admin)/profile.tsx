@@ -24,6 +24,7 @@ export default function AdminProfileScreen() {
             if (isLoggingOut) return;
 
             try {
+              console.log('🔵 AdminProfile: confirmando cierre de sesión');
               setIsLoggingOut(true);
               await logout();
               router.replace('/login');

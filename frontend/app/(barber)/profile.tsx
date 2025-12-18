@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import axios from 'axios';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -24,6 +25,7 @@ interface BarberProfile {
 
 export default function BarberProfileScreen() {
   const { user, logout } = useAuth();
+  const router = useRouter();
   const [barberProfile, setBarberProfile] = useState<BarberProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -80,7 +82,15 @@ export default function BarberProfileScreen() {
       '¿Estás seguro que deseas cerrar sesión?',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Cerrar Sesión', style: 'destructive', onPress: logout }
+        {
+          text: 'Cerrar Sesión',
+          style: 'destructive',
+          onPress: async () => {
+            console.log('🔵 BarberProfile: confirmando cierre de sesión');
+            await logout();
+            router.replace('/login');
+          }
+        }
       ]
     );
   };
