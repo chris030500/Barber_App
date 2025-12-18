@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { palette, typography } from '../styles/theme';
 
 export default function Index() {
+  const navigation = useRouter();
   const { user, isLoading } = useAuth();
   const hasNavigated = useRef(false);
 
@@ -28,8 +29,8 @@ export default function Index() {
     if (!redirectPath || hasNavigated.current) return;
 
     hasNavigated.current = true;
-    router.replace(redirectPath);
-  }, [redirectPath, router]);
+    navigation.replace(redirectPath);
+  }, [navigation, redirectPath]);
 
   return (
     <View style={styles.container}>
