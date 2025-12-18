@@ -1,48 +1,27 @@
-import React, { useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Redirect } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
+import { getRedirectPath } from '../utils/navigation';
 
 export default function Index() {
-  const router = useRouter();
   const { user, isLoading } = useAuth();
 
-  useEffect(() => {
-    console.log('🔵 Index: Navigation check', { 
-      user: user ? `${user.name} (${user.role})` : 'null', 
-      isLoading 
-    });
-    
-    if (!isLoading) {
-      if (user) {
-        console.log('✅ Index: User authenticated, navigating to role screen...', { role: user.role });
-        // Navigate based on user role
-        switch (user.role) {
-          case 'client':
-            router.replace('/(client)/home');
-            break;
-          case 'barber':
-            router.replace('/(barber)/schedule');
-            break;
-          case 'admin':
-            router.replace('/(admin)/dashboard');
-            break;
-          default:
-            router.replace('/(auth)/welcome');
-        }
-      } else {
-        console.log('🔵 Index: No user, navigating to welcome');
-        router.replace('/(auth)/welcome');
-      }
-    }
-  }, [user, isLoading]);
+  const redirectPath = useMemo(() => {
+    if (isLoading) return null;
+    return getRedirectPath(user);
+  }, [isLoading, user]);
 
-  return (
-    <View style={styles.container}>
-      <ActivityIndicator size="large" color="#2563EB" />
-      <Text style={styles.text}>Cargando...</Text>
-    </View>
-  );
+  if (!redirectPath) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#2563EB" />
+        <Text style={styles.text}>Cargando...</Text>
+      </View>
+    );
+  }
+
+  return <Redirect href={redirectPath} />;
 }
 
 const styles = StyleSheet.create({

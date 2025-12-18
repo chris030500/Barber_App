@@ -22,7 +22,7 @@ import { Platform } from 'react-native';
 
 const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || process.env.EXPO_PUBLIC_BACKEND_URL;
 
-interface User {
+export interface User {
   user_id: string;
   email: string;
   name: string;
@@ -57,50 +57,71 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
 
   useEffect(() => {
+    let isActive = true;
+    setIsLoading(true);
     console.log('🔵 AuthContext: Setting up onAuthStateChanged listener...');
-    
-    // Listen to Firebase auth state changes
+
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      if (!isActive) return;
+
       console.log('🔵 onAuthStateChanged triggered!', { fbUser: fbUser ? 'User exists' : 'No user' });
       setFirebaseUser(fbUser);
-      
-      if (fbUser) {
-        console.log('🔵 User signed in, fetching from backend...', { email: fbUser.email });
-        // User is signed in, fetch user data from backend
+
+      if (!fbUser) {
+        console.log('🔵 No user signed in, clearing user state');
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+
+      const fallbackUser: User = {
+        user_id: fbUser.uid,
+        email: fbUser.email || '',
+        name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Usuario',
+        role: 'client',
+        phone: fbUser.phoneNumber || undefined,
+        created_at: fbUser.metadata?.creationTime || new Date().toISOString(),
+        picture: fbUser.photoURL || undefined,
+      };
+
+      let resolvedUser: User = fallbackUser;
+
+      if (BACKEND_URL) {
         try {
           console.log('🔵 Fetching user from backend:', `${BACKEND_URL}/api/users?email=${fbUser.email}`);
           const response = await axios.get(`${BACKEND_URL}/api/users?email=${fbUser.email}`);
           console.log('✅ Backend response:', response.data);
-          
+
           if (response.data && response.data.length > 0) {
             console.log('✅ User found in backend:', response.data[0]);
-            setUser(response.data[0]);
+            resolvedUser = response.data[0];
           } else {
             console.log('⚠️ User not found in backend, creating new user...');
-            // Create user in backend if doesn't exist
             const newUserResponse = await axios.post(`${BACKEND_URL}/api/users`, {
               email: fbUser.email,
-              name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Usuario',
+              name: fallbackUser.name,
               role: 'client',
               phone: fbUser.phoneNumber || undefined,
             });
             console.log('✅ New user created:', newUserResponse.data);
-            setUser(newUserResponse.data);
+            resolvedUser = newUserResponse.data;
           }
         } catch (error) {
           console.error('❌ Error fetching user data:', error);
         }
       } else {
-        console.log('🔵 No user signed in, clearing user state');
-        setUser(null);
+        console.warn('⚠️ BACKEND_URL is not configured. Using Firebase profile only.');
       }
-      
+
+      if (!isActive) return;
+      setUser(resolvedUser);
       setIsLoading(false);
       console.log('✅ onAuthStateChanged completed, isLoading set to false');
     });
 
     return () => {
       console.log('🔵 Cleaning up onAuthStateChanged listener');
+      isActive = false;
       unsubscribe();
     };
   }, []);
@@ -127,19 +148,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log('🔵 Starting registration...', { email, name, role, BACKEND_URL });
       setIsLoading(true);
-      
+
       console.log('🔵 Creating Firebase user...');
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       console.log('✅ Firebase user created:', userCredential.user.uid);
-      
-      // Update profile with name
-      console.log('🔵 Updating profile with name...');
+
       await updateProfile(userCredential.user, {
         displayName: name,
       });
       console.log('✅ Profile updated');
 
-      // Create user in backend
+      if (!BACKEND_URL) {
+        console.warn('⚠️ BACKEND_URL is not configured. Registration will not persist to the backend.');
+        setUser({
+          user_id: userCredential.user.uid,
+          email,
+          name,
+          role: role as User['role'],
+          created_at: userCredential.user.metadata?.creationTime || new Date().toISOString(),
+        });
+        return;
+      }
+
       console.log('🔵 Creating user in backend...', `${BACKEND_URL}/api/users`);
       const response = await axios.post(`${BACKEND_URL}/api/users`, {
         email: email,
@@ -147,7 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: role,
       });
       console.log('✅ Backend user created:', response.data);
-      
+
       setUser(response.data);
       console.log('✅ Registration completed successfully!');
     } catch (error: any) {
@@ -287,6 +317,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return 'Número de teléfono inválido';
       case 'auth/invalid-verification-code':
         return 'Código de verificación inválido';
+      case 'auth/invalid-credential':
+        return 'Credencial inválida. Verifica tu correo/contraseña o la configuración de Firebase.';
       case 'auth/too-many-requests':
         return 'Demasiados intentos. Intenta más tarde';
       default:
