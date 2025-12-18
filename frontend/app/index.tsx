@@ -2,9 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Redirect } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
+import { palette, typography } from '../styles/theme';
 
 export default function Index() {
   const { user, isLoading } = useAuth();
+  const hasNavigated = useRef(false);
 
   if (isLoading) {
     return (
@@ -36,13 +38,24 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: palette.background,
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 24,
+  },
+  loaderCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: palette.surface,
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: palette.border,
+    alignItems: 'center',
   },
   text: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#64748B',
+    marginTop: 12,
+    ...typography.subheading,
+    color: palette.textSecondary,
   },
 });
