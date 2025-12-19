@@ -9,9 +9,10 @@ import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import { useAuth } from '../../contexts/AuthContext';
 import { getRedirectPath } from '../../utils/navigation';
-import { shadows } from '../../styles/theme';
+import { palette, shadows, typography } from '../../styles/theme';
 
 const roleShadow = shadows.accent;
+const accentColor = palette.accent;
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -210,15 +211,15 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   background: {
     flex: 1,
-    backgroundColor: '#0B1220',
+    backgroundColor: palette.background,
   },
   backgroundImage: {
-    opacity: 0.2,
+    opacity: 0.25,
     transform: [{ scale: 1.05 }],
   },
   safeArea: {
     flex: 1,
-    backgroundColor: 'rgba(6, 10, 22, 0.92)',
+    backgroundColor: 'rgba(5,10,20,0.92)',
   },
   scrollContent: {
     flexGrow: 1,
@@ -235,43 +236,41 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   logoBadge: {
-    backgroundColor: '#FACC15',
+    backgroundColor: accentColor,
     padding: 12,
     borderRadius: 12,
     ...roleShadow,
   },
   brand: {
+    ...typography.heading,
     fontSize: 18,
-    color: '#E2E8F0',
-    fontWeight: '700',
   },
   tagline: {
-    fontSize: 14,
-    color: '#94A3B8',
+    ...typography.body,
     marginTop: 2,
   },
   hero: {
     marginTop: 16,
     fontSize: 24,
     fontWeight: '800',
-    color: '#F8FAFC',
+    color: palette.textPrimary,
     textAlign: 'center',
     letterSpacing: 0.2,
   },
   heroSub: {
     marginTop: 8,
     fontSize: 14,
-    color: '#CBD5E1',
+    color: palette.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
     maxWidth: 420,
   },
   card: {
-    backgroundColor: 'rgba(15, 23, 42, 0.82)',
+    backgroundColor: palette.surface,
     borderRadius: 22,
     padding: 20,
     borderWidth: 1,
-    borderColor: 'rgba(226, 232, 240, 0.1)',
+    borderColor: palette.border,
     gap: 8,
     ...roleShadow,
   },
@@ -280,7 +279,7 @@ const styles = StyleSheet.create({
   },
   pill: {
     alignSelf: 'flex-start',
-    backgroundColor: '#FACC15',
+    backgroundColor: palette.accentSecondary,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 999,
@@ -296,11 +295,11 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#F8FAFC',
+    color: palette.textPrimary,
   },
   cardSubtitle: {
     fontSize: 14,
-    color: '#CBD5E1',
+    color: palette.textSecondary,
     lineHeight: 20,
   },
   roleSection: {
@@ -315,11 +314,11 @@ const styles = StyleSheet.create({
   roleLabel: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#E2E8F0',
+    color: palette.textPrimary,
   },
   roleHint: {
     fontSize: 12,
-    color: '#94A3B8',
+    color: palette.textSecondary,
   },
   roleButtons: {
     flexDirection: 'row',
@@ -330,41 +329,41 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderColor: palette.border,
+    backgroundColor: palette.surfaceAlt,
     gap: 6,
   },
   roleCardSelected: {
-    borderColor: '#2563EB',
-    backgroundColor: 'rgba(37,99,235,0.08)',
+    borderColor: accentColor,
+    backgroundColor: 'rgba(139,92,246,0.12)',
     ...roleShadow,
   },
   roleIconBadge: {
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   roleText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#E2E8F0',
+    color: palette.textPrimary,
   },
   roleTextSelected: {
-    color: '#BFDBFE',
+    color: palette.accentSecondary,
   },
   roleDesc: {
     fontSize: 12,
-    color: '#CBD5E1',
+    color: palette.textSecondary,
   },
   button: {
     marginTop: 10,
-    backgroundColor: '#2563EB',
+    backgroundColor: accentColor,
   },
   buttonText: {
-    color: '#F8FAFC',
+    color: palette.textPrimary,
     letterSpacing: 0.2,
   },
   secondaryAction: {
@@ -375,11 +374,11 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   secondaryText: {
-    color: '#CBD5E1',
+    color: palette.textSecondary,
     fontSize: 14,
   },
   secondaryLink: {
-    color: '#93C5FD',
+    color: palette.accent,
     fontWeight: '700',
     fontSize: 14,
   },

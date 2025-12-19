@@ -7,10 +7,11 @@ import { StatusBar } from 'expo-status-bar';
 import Button from '../../components/ui/Button';
 import { useAuth } from '../../contexts/AuthContext';
 import { getRedirectPath } from '../../utils/navigation';
-import { shadows } from '../../styles/theme';
+import { palette, shadows, typography } from '../../styles/theme';
 
 const badgeShadow = shadows.soft;
 const tileShadow = shadows.elevated;
+const accentColor = palette.accent;
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -100,11 +101,11 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   background: {
     flex: 1,
-    backgroundColor: '#0B1220',
+    backgroundColor: palette.background,
   },
   backgroundImage: {
     resizeMode: 'cover',
-    opacity: 0.18,
+    opacity: 0.2,
   },
   container: {
     flex: 1,
@@ -126,28 +127,27 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 16,
-    backgroundColor: '#FACC15',
+    backgroundColor: accentColor,
     alignItems: 'center',
     justifyContent: 'center',
     ...badgeShadow,
   },
   brand: {
-    color: '#F8FAFC',
+    ...typography.heading,
     fontSize: 22,
-    fontWeight: '700',
   },
   tagline: {
-    color: '#CBD5E1',
+    ...typography.body,
     fontSize: 14,
   },
   title: {
-    color: '#E2E8F0',
+    color: palette.textPrimary,
     fontSize: 30,
     fontWeight: '800',
     lineHeight: 36,
   },
   subtitle: {
-    color: '#94A3B8',
+    color: palette.textSecondary,
     fontSize: 15,
     lineHeight: 22,
     maxWidth: 520,
@@ -156,31 +156,31 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   tile: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: palette.surface,
     borderRadius: 18,
     padding: 14,
     flexDirection: 'row',
     gap: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: palette.border,
     ...tileShadow,
   },
   tileIcon: {
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: '#FACC15',
+    backgroundColor: palette.accentSecondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   tileTitle: {
-    color: '#F8FAFC',
+    color: palette.textPrimary,
     fontSize: 16,
     fontWeight: '800',
   },
   tileText: {
-    color: '#CBD5E1',
+    color: palette.textSecondary,
     fontSize: 14,
   },
   actions: {
@@ -188,20 +188,20 @@ const styles = StyleSheet.create({
   },
   primary: {
     width: '100%',
-    backgroundColor: '#2563EB',
+    backgroundColor: accentColor,
   },
   primaryText: {
-    color: '#F8FAFC',
+    color: palette.textPrimary,
     letterSpacing: 0.2,
   },
   secondary: {
-    borderColor: '#F8FAFC',
+    borderColor: palette.border,
   },
   secondaryText: {
-    color: '#F8FAFC',
+    color: palette.textPrimary,
   },
   helper: {
-    color: '#CBD5E1',
+    color: palette.textSecondary,
     textAlign: 'center',
     marginTop: 4,
   },
