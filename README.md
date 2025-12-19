@@ -71,6 +71,10 @@ Guía rápida para levantar el backend (FastAPI) y el frontend (Expo) en tu comp
   1. Entra al contenedor de MongoDB: `docker exec -it <mongo-container> mongosh` (el nombre suele ser `barber_app_pichi-mongo-1`).
   2. Selecciona la base usada por la app: `use ${DB_NAME:-barbershop_db}`.
   3. Lista las colecciones disponibles: `show collections`.
+- Programa de fidelidad (MVP):
+  - Configura reglas en `PUT /api/loyalty/rules` (puntos por cita, bono por referido, meta de recompensa) y consulta las vigentes en `GET /api/loyalty/rules`.
+  - Visualiza el progreso de un usuario con `GET /api/loyalty/wallet/{user_id}` y registra su código de referido con `POST /api/loyalty/referrals`.
+  - Acredita puntos al cerrar una cita completada con `POST /api/loyalty/earn/appointment` (evita duplicados por cita).
 
 ## Pruebas manuales rápidas
 - **Roles y navegación:** inicia sesión con un administrador y confirma que carga el layout de pestañas de admin; repite con un cliente y verifica que llegue al flujo `(client)`.

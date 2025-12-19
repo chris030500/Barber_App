@@ -44,6 +44,8 @@ export interface User {
   role: 'client' | 'barber' | 'admin';
   phone?: string;
   barbershop_id?: string;
+   referral_code?: string;
+   referred_by?: string;
   created_at: string;
 }
 

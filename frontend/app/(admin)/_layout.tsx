@@ -78,6 +78,15 @@ export default function AdminLayout() {
         }}
       />
       <Tabs.Screen
+        name="loyalty"
+        options={{
+          title: 'Fidelidad',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="gift" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: 'Perfil',

@@ -57,6 +57,8 @@ class User(BaseModel):
     role: str = "client"  # client, barber, admin
     phone: Optional[str] = None
     barbershop_id: Optional[str] = None
+    referral_code: Optional[str] = None
+    referred_by: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class UserCreate(BaseModel):
@@ -170,6 +172,30 @@ class PushTokenCreate(BaseModel):
     device_info: Optional[dict] = None
 
 
+class LoyaltyRules(BaseModel):
+    rule_id: str = Field(default="default")
+    points_per_completed_appointment: int = Field(default=10, ge=0)
+    referral_bonus: int = Field(default=50, ge=0)
+    reward_threshold: int = Field(default=200, ge=1)
+    reward_description: str = Field(default="Corte gratis o upgrade de servicio")
+
+
+class LoyaltyWallet(BaseModel):
+    user_id: str
+    points: int = 0
+    referred_by: Optional[str] = None
+    history: List[dict] = Field(default_factory=list)
+
+
+class ReferralRequest(BaseModel):
+    user_id: str
+    referral_code: str
+
+
+class AppointmentEarnRequest(BaseModel):
+    appointment_id: str
+
+
 def validate_working_hours(working_hours: dict):
     """Validar formato HH:MM y que la hora de apertura sea menor al cierre."""
     if not working_hours:
@@ -194,6 +220,47 @@ def validate_working_hours(working_hours: dict):
         if open_time >= close_time:
             raise HTTPException(status_code=400, detail=f"La hora de apertura debe ser menor a cierre para {day}")
 
+
+def generate_referral_code(email: str) -> str:
+    prefix = email.split("@")[0][:4].upper()
+    return f"{prefix}{uuid.uuid4().hex[:4].upper()}"
+
+
+async def ensure_loyalty_rules():
+    rules = await db.loyalty_rules.find_one({"rule_id": "default"}, {"_id": 0})
+    if not rules:
+        default_rules = LoyaltyRules().dict()
+        await db.loyalty_rules.insert_one(default_rules)
+        return default_rules
+    return rules
+
+
+async def ensure_wallet(user_id: str) -> dict:
+    wallet = await db.loyalty_wallets.find_one({"user_id": user_id}, {"_id": 0})
+    if not wallet:
+        wallet = LoyaltyWallet(user_id=user_id).dict()
+        await db.loyalty_wallets.insert_one(wallet)
+    return wallet
+
+
+async def send_push_notification(user_id: str, title: str, body: str):
+    try:
+        tokens = await db.push_tokens.find({"user_id": user_id}, {"_id": 0, "token": 1}).to_list(10)
+        if not tokens:
+            return
+
+        async with httpx.AsyncClient(timeout=5) as client_httpx:
+            for item in tokens:
+                payload = {
+                    "to": item.get("token"),
+                    "sound": "default",
+                    "title": title,
+                    "body": body,
+                }
+                await client_httpx.post("https://exp.host/--/api/v2/push/send", json=payload)
+    except Exception as e:
+        logger.warning(f"No se pudo enviar push: {e}")
+
 # ==================== ENDPOINTS ====================
 
 @api_router.get("/")
@@ -205,7 +272,9 @@ async def root():
 @api_router.post("/users", response_model=User)
 async def create_user(user_data: UserCreate):
     try:
-        user = User(**user_data.dict())
+        payload = user_data.dict()
+        payload["referral_code"] = generate_referral_code(user_data.email)
+        user = User(**payload)
         result = await db.users.insert_one(user.dict())
         return user
     except Exception as e:
@@ -217,6 +286,10 @@ async def get_user(user_id: str):
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    if not user.get("referral_code"):
+        referral_code = generate_referral_code(user.get("email", "user"))
+        await db.users.update_one({"user_id": user_id}, {"$set": {"referral_code": referral_code}})
+        user["referral_code"] = referral_code
     return user
 
 @api_router.get("/users", response_model=List[User])
@@ -227,6 +300,11 @@ async def list_users(role: Optional[str] = None, email: Optional[str] = None, li
     if email:
         query["email"] = email
     users = await db.users.find(query, {"_id": 0}).limit(limit).to_list(limit)
+    for user in users:
+        if not user.get("referral_code"):
+            referral_code = generate_referral_code(user.get("email", "user"))
+            await db.users.update_one({"user_id": user.get("user_id")}, {"$set": {"referral_code": referral_code}})
+            user["referral_code"] = referral_code
     return users
 
 # ==================== BARBERSHOPS ====================
@@ -478,6 +556,143 @@ async def get_user_tokens(user_id: str):
         {"_id": 0}
     ).to_list(100)
     return tokens
+
+# ==================== LOYALTY & REFERRALS ====================
+
+
+@api_router.get("/loyalty/rules", response_model=LoyaltyRules)
+async def get_loyalty_rules():
+    rules = await ensure_loyalty_rules()
+    return rules
+
+
+@api_router.put("/loyalty/rules", response_model=LoyaltyRules)
+async def update_loyalty_rules(updates: LoyaltyRules):
+    data = updates.dict()
+    data["rule_id"] = "default"
+    await db.loyalty_rules.update_one(
+        {"rule_id": "default"},
+        {"$set": data},
+        upsert=True,
+    )
+    return data
+
+
+@api_router.get("/loyalty/wallet/{user_id}", response_model=LoyaltyWallet)
+async def get_loyalty_wallet(user_id: str):
+    wallet = await ensure_wallet(user_id)
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "referred_by": 1})
+    if user:
+        wallet["referred_by"] = user.get("referred_by")
+    return wallet
+
+
+@api_router.post("/loyalty/referrals")
+async def register_referral(request: ReferralRequest):
+    user = await db.users.find_one({"user_id": request.user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    if user.get("referred_by"):
+        return {"message": "El usuario ya tiene un referido registrado"}
+
+    referrer = await db.users.find_one({"referral_code": request.referral_code})
+    if not referrer:
+        raise HTTPException(status_code=404, detail="Código de referido inválido")
+
+    await db.users.update_one({"user_id": request.user_id}, {"$set": {"referred_by": referrer.get("user_id")}})
+    await db.loyalty_wallets.update_one(
+        {"user_id": request.user_id},
+        {"$set": {"referred_by": referrer.get("user_id")}},
+        upsert=True,
+    )
+
+    return {"message": "Referido registrado"}
+
+
+@api_router.post("/loyalty/earn/appointment")
+async def earn_points_from_appointment(request: AppointmentEarnRequest):
+    appointment = await db.appointments.find_one({"appointment_id": request.appointment_id})
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Cita no encontrada")
+
+    if appointment.get("status") != "completed":
+        raise HTTPException(status_code=400, detail="La cita debe estar completada para sumar puntos")
+
+    client_id = appointment.get("client_user_id")
+    if not client_id:
+        raise HTTPException(status_code=400, detail="La cita no tiene cliente asignado")
+
+    rules = await ensure_loyalty_rules()
+    wallet = await ensure_wallet(client_id)
+
+    # Evitar duplicados por la misma cita
+    already_recorded = any(
+        entry.get("source_id") == request.appointment_id and entry.get("type") == "appointment"
+        for entry in wallet.get("history", [])
+    )
+    if already_recorded:
+        return wallet
+
+    earned_points = rules.get("points_per_completed_appointment", 0)
+
+    wallet["points"] = wallet.get("points", 0) + earned_points
+    wallet.setdefault("history", []).append(
+        {
+            "type": "appointment",
+            "points": earned_points,
+            "source_id": request.appointment_id,
+            "created_at": datetime.now(timezone.utc),
+        }
+    )
+
+    await db.loyalty_wallets.update_one(
+        {"user_id": client_id},
+        {"$set": {"points": wallet["points"], "history": wallet["history"]}},
+        upsert=True,
+    )
+
+    # Bono por referido tras primera cita completada
+    client = await db.users.find_one({"user_id": client_id}, {"_id": 0})
+    referrer_id = client.get("referred_by") if client else None
+    if referrer_id:
+        referrer_wallet = await ensure_wallet(referrer_id)
+        has_reward = any(
+            entry.get("type") == "referral_bonus" and entry.get("source_id") == client_id
+            for entry in referrer_wallet.get("history", [])
+        )
+        if not has_reward:
+            bonus = rules.get("referral_bonus", 0)
+            referrer_wallet["points"] = referrer_wallet.get("points", 0) + bonus
+            referrer_wallet.setdefault("history", []).append(
+                {
+                    "type": "referral_bonus",
+                    "points": bonus,
+                    "source_id": client_id,
+                    "created_at": datetime.now(timezone.utc),
+                }
+            )
+            await db.loyalty_wallets.update_one(
+                {"user_id": referrer_id},
+                {"$set": {"points": referrer_wallet["points"], "history": referrer_wallet["history"]}},
+                upsert=True,
+            )
+
+            await send_push_notification(
+                referrer_id,
+                "🎉 Nuevo bono por referido",
+                "Tu referido completó su primera cita. Se acreditaron puntos en tu cuenta.",
+            )
+
+    # Notificación de recompensa alcanzada
+    if wallet.get("points", 0) >= rules.get("reward_threshold", 0):
+        await send_push_notification(
+            client_id,
+            "🎁 ¡Recompensa disponible!",
+            f"Has alcanzado {wallet.get('points', 0)} puntos. {rules.get('reward_description')}.",
+        )
+
+    return wallet
 
 # ==================== ADMIN DASHBOARD ====================
 
