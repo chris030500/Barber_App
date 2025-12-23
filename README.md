@@ -75,6 +75,9 @@ Guía rápida para levantar el backend (FastAPI) y el frontend (Expo) en tu comp
   - Configura reglas en `PUT /api/loyalty/rules` (puntos por cita, bono por referido, meta de recompensa) y consulta las vigentes en `GET /api/loyalty/rules`.
   - Visualiza el progreso de un usuario con `GET /api/loyalty/wallet/{user_id}` y registra su código de referido con `POST /api/loyalty/referrals`.
   - Acredita puntos al cerrar una cita completada con `POST /api/loyalty/earn/appointment` (evita duplicados por cita).
+- Reservas y recordatorios:
+  - Crea citas con anticipo opcional enviando `deposit_required` y `deposit_amount` a `POST /api/appointments`; registra el pago simulado con `POST /api/payments/deposits` y confirma estados con `POST /api/payments/deposits/{id}/confirm`.
+  - Reprograma con `POST /api/appointments/{id}/reschedule` (regla: al menos 2h antes) y dispara recordatorios push/SMS manualmente con `POST /api/appointments/reminders/run` (ventanas de 24h y 2h).
 
 ## Pruebas manuales rápidas
 - **Roles y navegación:** inicia sesión con un administrador y confirma que carga el layout de pestañas de admin; repite con un cliente y verifica que llegue al flujo `(client)`.

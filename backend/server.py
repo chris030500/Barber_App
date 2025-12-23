@@ -136,6 +136,12 @@ class Appointment(BaseModel):
     status: str = "scheduled"  # scheduled, confirmed, in_progress, completed, cancelled
     notes: Optional[str] = None
     reminder_sent: bool = False
+    reminder_24h_sent: bool = False
+    reminder_2h_sent: bool = False
+    deposit_required: bool = False
+    deposit_amount: Optional[float] = Field(default=None, ge=0)
+    deposit_status: str = "not_required"  # not_required, pending, paid, failed, refunded
+    deposit_id: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -146,6 +152,41 @@ class AppointmentCreate(BaseModel):
     service_id: str
     scheduled_time: datetime
     notes: Optional[str] = None
+    deposit_required: bool = False
+    deposit_amount: Optional[float] = Field(default=None, ge=0)
+
+
+class RescheduleRequest(BaseModel):
+    new_time: datetime
+    reason: Optional[str] = None
+
+
+class Deposit(BaseModel):
+    deposit_id: str = Field(default_factory=lambda: f"dep_{uuid.uuid4().hex[:12]}")
+    appointment_id: Optional[str] = None
+    client_user_id: Optional[str] = None
+    amount: float = Field(gt=0)
+    currency: str = "USD"
+    status: str = "pending"  # pending, paid, failed, cancelled, refunded
+    provider: str = "manual"  # manual, stripe, mercado_pago
+    payment_url: Optional[str] = None
+    metadata: Dict[str, str] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class DepositCreate(BaseModel):
+    appointment_id: Optional[str] = None
+    client_user_id: Optional[str] = None
+    amount: float = Field(gt=0)
+    currency: str = "USD"
+    provider: str = "manual"
+    metadata: Dict[str, str] = Field(default_factory=dict)
+
+
+class DepositStatusUpdate(BaseModel):
+    status: str
+    payment_url: Optional[str] = None
 
 class ClientHistory(BaseModel):
     history_id: str = Field(default_factory=lambda: f"hist_{uuid.uuid4().hex[:12]}")
@@ -271,6 +312,29 @@ async def send_push_notification(user_id: str, title: str, body: str):
                 await client_httpx.post("https://exp.host/--/api/v2/push/send", json=payload)
     except Exception as e:
         logger.warning(f"No se pudo enviar push: {e}")
+
+
+def to_aware_datetime(value: datetime) -> datetime:
+    if value is None:
+        return datetime.now(timezone.utc)
+    if isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except Exception:
+            parsed = datetime.now(timezone.utc)
+    else:
+        parsed = value
+
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+async def send_sms_placeholder(phone: Optional[str], message: str):
+    if not phone:
+        return
+    # Placeholder para integrar Twilio u otro proveedor en el futuro.
+    logger.info(f"[SMS placeholder] to {phone}: {message}")
 
 # ==================== ENDPOINTS ====================
 
@@ -466,7 +530,18 @@ async def delete_service(service_id: str):
 @api_router.post("/appointments", response_model=Appointment)
 async def create_appointment(appt_data: AppointmentCreate):
     try:
-        appointment = Appointment(**appt_data.dict())
+        payload = appt_data.dict()
+        deposit_required = payload.get("deposit_required", False)
+        deposit_amount = payload.get("deposit_amount")
+
+        if deposit_required:
+            if deposit_amount is None or deposit_amount <= 0:
+                raise HTTPException(status_code=400, detail="El anticipo debe ser mayor a 0 si es requerido")
+            payload["deposit_status"] = "pending"
+        else:
+            payload["deposit_status"] = "not_required"
+
+        appointment = Appointment(**payload)
         await db.appointments.insert_one(appointment.dict())
         return appointment
     except Exception as e:
@@ -513,12 +588,175 @@ async def update_appointment(appointment_id: str, updates: dict):
     appt = await db.appointments.find_one({"appointment_id": appointment_id}, {"_id": 0})
     return appt
 
+@api_router.post("/appointments/{appointment_id}/reschedule", response_model=Appointment)
+async def reschedule_appointment(appointment_id: str, request: RescheduleRequest):
+    appt = await db.appointments.find_one({"appointment_id": appointment_id})
+    if not appt:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+
+    if appt.get("status") in {"completed", "cancelled"}:
+        raise HTTPException(status_code=400, detail="No se puede reprogramar una cita cerrada")
+
+    current_time = to_aware_datetime(appt.get("scheduled_time"))
+    new_time = to_aware_datetime(request.new_time)
+    now = datetime.now(timezone.utc)
+
+    if new_time <= now:
+        raise HTTPException(status_code=400, detail="La nueva hora debe ser futura")
+
+    if current_time - now < timedelta(hours=2):
+        raise HTTPException(status_code=400, detail="Solo puedes reprogramar hasta 2 horas antes de la cita")
+
+    updates = {
+        "scheduled_time": new_time,
+        "status": "scheduled",
+        "reminder_24h_sent": False,
+        "reminder_2h_sent": False,
+        "reminder_sent": False,
+        "updated_at": datetime.now(timezone.utc),
+    }
+
+    if request.reason:
+        updates["notes"] = f"[Reprogramada] {request.reason}"
+
+    await db.appointments.update_one({"appointment_id": appointment_id}, {"$set": updates})
+    appt = await db.appointments.find_one({"appointment_id": appointment_id}, {"_id": 0})
+    return appt
+
+
+@api_router.post("/appointments/reminders/run")
+async def run_appointment_reminders():
+    now = datetime.now(timezone.utc)
+    horizon = now + timedelta(hours=26)
+
+    appointments = await db.appointments.find({
+        "status": {"$in": ["scheduled", "confirmed"]},
+        "scheduled_time": {"$lte": horizon}
+    }).to_list(length=500)
+
+    reminders_sent = []
+
+    for appt in appointments:
+        scheduled_dt = to_aware_datetime(appt.get("scheduled_time"))
+        delta = scheduled_dt - now
+
+        client_id = appt.get("client_user_id")
+        client = await db.users.find_one({"user_id": client_id}) if client_id else None
+        client_phone = client.get("phone") if client else None
+
+        # 24h reminder window: 23h30m to 24h30m
+        if (
+            not appt.get("reminder_24h_sent")
+            and timedelta(hours=23, minutes=30) <= delta <= timedelta(hours=24, minutes=30)
+        ):
+            title = "Recordatorio de tu cita"
+            body = "Te esperamos en 24h. Si necesitas reprogramar, hazlo con más de 2h de anticipación."
+            await send_push_notification(client_id, title, body)
+            await send_sms_placeholder(client_phone, body)
+            await db.appointments.update_one(
+                {"appointment_id": appt.get("appointment_id")},
+                {"$set": {"reminder_24h_sent": True, "reminder_sent": True, "updated_at": datetime.now(timezone.utc)}}
+            )
+            reminders_sent.append({"appointment_id": appt.get("appointment_id"), "type": "24h"})
+
+        # 2h reminder window: 90m to 150m
+        if (
+            not appt.get("reminder_2h_sent")
+            and timedelta(minutes=90) <= delta <= timedelta(minutes=150)
+        ):
+            title = "Tu cita es en 2 horas"
+            body = "Confirma tu llegada o reprograma si es necesario."
+            await send_push_notification(client_id, title, body)
+            await send_sms_placeholder(client_phone, body)
+            await db.appointments.update_one(
+                {"appointment_id": appt.get("appointment_id")},
+                {"$set": {"reminder_2h_sent": True, "updated_at": datetime.now(timezone.utc)}}
+            )
+            reminders_sent.append({"appointment_id": appt.get("appointment_id"), "type": "2h"})
+
+    return {"sent": reminders_sent, "count": len(reminders_sent)}
+
+
 @api_router.delete("/appointments/{appointment_id}")
 async def delete_appointment(appointment_id: str):
     result = await db.appointments.delete_one({"appointment_id": appointment_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Appointment not found")
     return {"message": "Appointment deleted successfully"}
+
+# ==================== PAYMENTS / DEPOSITS ====================
+
+
+@api_router.post("/payments/deposits", response_model=Deposit)
+async def create_deposit(deposit_data: DepositCreate):
+    if deposit_data.appointment_id:
+        appt = await db.appointments.find_one({"appointment_id": deposit_data.appointment_id})
+        if not appt:
+            raise HTTPException(status_code=404, detail="Appointment not found")
+
+        if appt.get("deposit_status") == "paid":
+            raise HTTPException(status_code=400, detail="La cita ya tiene un anticipo pagado")
+
+    deposit = Deposit(**deposit_data.dict())
+
+    # Placeholder de integración de pago: genera una URL simulada
+    payment_url = f"https://payments.example.com/pay/{deposit.deposit_id}"
+    deposit.payment_url = payment_url
+
+    await db.deposits.insert_one(deposit.dict())
+
+    if deposit.appointment_id:
+        await db.appointments.update_one(
+            {"appointment_id": deposit.appointment_id},
+            {
+                "$set": {
+                    "deposit_status": "pending",
+                    "deposit_id": deposit.deposit_id,
+                    "deposit_amount": deposit.amount,
+                    "updated_at": datetime.now(timezone.utc),
+                }
+            },
+        )
+
+    return deposit
+
+
+@api_router.get("/payments/deposits/{deposit_id}", response_model=Deposit)
+async def get_deposit(deposit_id: str):
+    deposit = await db.deposits.find_one({"deposit_id": deposit_id}, {"_id": 0})
+    if not deposit:
+        raise HTTPException(status_code=404, detail="Deposit not found")
+    return deposit
+
+
+@api_router.post("/payments/deposits/{deposit_id}/confirm", response_model=Deposit)
+async def confirm_deposit(deposit_id: str, body: DepositStatusUpdate):
+    if body.status not in {"paid", "failed", "cancelled", "refunded"}:
+        raise HTTPException(status_code=400, detail="Estado de depósito inválido")
+
+    update_data = {"status": body.status, "updated_at": datetime.now(timezone.utc)}
+    if body.payment_url:
+        update_data["payment_url"] = body.payment_url
+
+    result = await db.deposits.update_one({"deposit_id": deposit_id}, {"$set": update_data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Deposit not found")
+
+    deposit = await db.deposits.find_one({"deposit_id": deposit_id}, {"_id": 0})
+
+    if deposit and deposit.get("appointment_id"):
+        await db.appointments.update_one(
+            {"appointment_id": deposit.get("appointment_id")},
+            {
+                "$set": {
+                    "deposit_status": body.status,
+                    "deposit_id": deposit_id,
+                    "updated_at": datetime.now(timezone.utc),
+                }
+            },
+        )
+
+    return deposit
 
 # ==================== CLIENT HISTORY ====================
 
