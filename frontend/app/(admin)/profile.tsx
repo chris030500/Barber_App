@@ -119,8 +119,6 @@ export default function AdminProfileScreen() {
           title={isLoggingOut ? 'Cerrando sesión...' : '🚪 Cerrar Sesión'}
           onPress={handleLogout}
           disabled={isLoggingOut}
-          loading={isLoggingOut}
-          variant="danger"
           style={styles.logoutButton}
           textStyle={styles.logoutText}
         />

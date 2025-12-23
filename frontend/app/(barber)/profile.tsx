@@ -266,12 +266,13 @@ export default function BarberProfileScreen() {
             </View>
           )}
 
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} disabled={isLoggingOut}>
-            <Ionicons name="log-out-outline" size={22} color={palette.danger} />
-            <Text style={styles.logoutText}>
-              {isLoggingOut ? 'Cerrando sesión...' : 'Cerrar Sesión'}
-            </Text>
-          </TouchableOpacity>
+          <Button
+            title={isLoggingOut ? 'Cerrando sesión...' : '🚪 Cerrar Sesión'}
+            onPress={handleLogout}
+            disabled={isLoggingOut}
+            style={styles.logoutButton}
+            textStyle={styles.logoutText}
+          />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -469,19 +470,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
     marginTop: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.surfaceAlt,
   },
   logoutText: {
     ...typography.subheading,
-    color: palette.danger,
+    color: palette.textPrimary,
   },
 });
